@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEURAL ARENA | Neon Switch</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        /* --- CORE STYLES --- */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: #020202; color: #fff; font-family: 'Rajdhani', sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+            min-height: 100vh; overflow-y: auto; padding-top: 20px; padding-bottom: 50px;
+            user-select: none;
+        }
+        #neural-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; background: radial-gradient(circle at center, #001a33 0%, #000 100%); }
+        .scanlines { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2)); background-size: 100% 4px; pointer-events: none; z-index: -1; opacity: 0.3; }
+
+        .back-btn { position: absolute; top: 30px; left: 30px; text-decoration: none; color: #00bfff; font-family: 'Orbitron'; font-size: 1rem; border: 1px solid #00bfff; padding: 10px 20px; border-radius: 5px; transition: 0.3s; background: rgba(0, 191, 255, 0.1); }
+        .back-btn:hover { background-color: #00bfff; color: #000; box-shadow: 0 0 25px #00bfff; }
+
+        h1 { font-family: 'Orbitron'; font-size: 3.5rem; text-shadow: 0 0 20px #00bfff; color: #00bfff; margin-bottom: 30px; margin-top: 40px; }
+
+        /* GRID */
+        #switch-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 70px);
+            grid-template-rows: repeat(5, 70px);
+            gap: 10px;
+            padding: 20px;
+            background: rgba(0, 20, 40, 0.8);
+            border: 2px solid #00bfff;
+            border-radius: 10px;
+            box-shadow: 0 0 40px rgba(0, 191, 255, 0.2);
+        }
+
+        .panel {
+            width: 70px; height: 70px;
+            background: #111;
+            border: 2px solid #333;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: inset 0 0 10px #000;
+        }
+
+        .panel.on {
+            background: #00bfff;
+            border-color: #fff;
+            box-shadow: 0 0 20px #00bfff, inset 0 0 10px #fff;
+        }
+        
+        .panel:hover { transform: scale(1.05); }
+        .panel.ai-target { border-color: #ff0055; box-shadow: 0 0 25px #ff0055; transform: scale(0.9); }
+
+        .controls-area { margin-top: 30px; display: flex; gap: 20px; }
+        button {
+            padding: 10px 30px; font-family: 'Orbitron'; font-size: 1rem; color: #000; background: #00bfff;
+            border: none; cursor: pointer; border-radius: 5px; box-shadow: 0 0 20px #00bfff; transition: 0.3s;
+        }
+        button:hover { transform: scale(1.1); box-shadow: 0 0 40px #00bfff; }
+        .btn-guide { background: transparent; border: 2px solid #00bfff; color: #00bfff; }
+        .btn-guide:hover { background: #00bfff; color: #000; }
+
+        .swal-custom-popup { background: #0a0a0a !important; border: 2px solid #00bfff !important; }
+        .swal-custom-title { color: #00bfff !important; font-family: 'Orbitron' !important; }
+        .swal-custom-content { color: #ccc !important; font-family: 'Rajdhani' !important; font-size: 1.1rem; text-align: left;}
+    </style>
+</head>
+<body>
+    <canvas id="neural-bg"></canvas>
+    <div class="scanlines"></div>
+
+    <a href="/" class="back-btn">← DASHBOARD</a>
+    <h1>NEON SWITCH</h1>
+
+    <div id="switch-grid"></div>
+
+    <div class="controls-area">
+        <button class="btn-guide" onclick="showGuide()">MISSION BRIEF</button>
+        <button onclick="initGame()">SCRAMBLE CIRCUIT</button>
+        <button onclick="runAI()">AI CASCADE</button>
+    </div>
+
+    <script>
+        const bgCanvas = document.getElementById('neural-bg'); const bgCtx = bgCanvas.getContext('2d');
+        bgCanvas.width = window.innerWidth; bgCanvas.height = window.innerHeight;
+        let particles=[]; class Particle{constructor(){this.x=Math.random()*bgCanvas.width;this.y=Math.random()*bgCanvas.height;this.size=Math.random()*2;this.speedX=(Math.random()*1.0)-0.5;this.speedY=(Math.random()*1.0)-0.5;this.color='#00bfff';}update(){this.x+=this.speedX;this.y+=this.speedY;if(this.x<0||this.x>bgCanvas.width)this.speedX*=-1;if(this.y<0||this.y>bgCanvas.height)this.speedY*=-1;}draw(){bgCtx.fillStyle=this.color;bgCtx.beginPath();bgCtx.arc(this.x,this.y,this.size,0,Math.PI*2);bgCtx.fill();}}
+        function initBg(){particles=[];for(let i=0;i<60;i++)particles.push(new Particle());}
+        function animateBg(){bgCtx.clearRect(0,0,bgCanvas.width,bgCanvas.height);for(let i=0;i<particles.length;i++){particles[i].update();particles[i].draw();connect(i);}requestAnimationFrame(animateBg);}
+        function connect(a){for(let b=a;b<particles.length;b++){let dist=((particles[a].x-particles[b].x)**2+(particles[a].y-particles[b].y)**2);if(dist<(bgCanvas.width/7)*(bgCanvas.height/7)){bgCtx.strokeStyle='rgba(0, 191, 255,'+(1-dist/25000)+')';bgCtx.lineWidth=1;bgCtx.beginPath();bgCtx.moveTo(particles[a].x,particles[a].y);bgCtx.lineTo(particles[b].x,particles[b].y);bgCtx.stroke();}}}
+        window.addEventListener('resize',()=>{bgCanvas.width=window.innerWidth;bgCanvas.height=window.innerHeight;initBg();});initBg(); animateBg();
+    </script>
+
+    <script>
+        const SIZE = 5;
+        let grid = [];
+        let isProcessing = false;
+
+        function initGame() {
+            const container = document.getElementById('switch-grid');
+            container.innerHTML = '';
+            grid = [];
+            isProcessing = false;
+
+            // Init empty
+            for(let r=0; r<SIZE; r++) {
+                let row = [];
+                for(let c=0; c<SIZE; c++) {
+                    row.push(0);
+                    let div = document.createElement('div');
+                    div.className = 'panel';
+                    div.id = `p-${r}-${c}`;
+                    div.onclick = () => playerClick(r, c);
+                    container.appendChild(div);
+                }
+                grid.push(row);
+            }
+
+            // Scramble (Simulate clicks to ensure solvability)
+            for(let i=0; i<15; i++) {
+                let r = Math.floor(Math.random() * SIZE);
+                let c = Math.floor(Math.random() * SIZE);
+                toggle(r, c);
+            }
+        }
+
+        function playerClick(r, c) {
+            if(isProcessing) return;
+            toggle(r, c);
+            checkWin();
+        }
+
+        function toggle(r, c) {
+            // Self
+            flip(r, c);
+            // Neighbors
+            flip(r-1, c);
+            flip(r+1, c);
+            flip(r, c-1);
+            flip(r, c+1);
+        }
+
+        function flip(r, c) {
+            if(r >= 0 && r < SIZE && c >= 0 && c < SIZE) {
+                grid[r][c] = 1 - grid[r][c];
+                let el = document.getElementById(`p-${r}-${c}`);
+                if(grid[r][c]) el.classList.add('on');
+                else el.classList.remove('on');
+            }
+        }
+
+        function checkWin() {
+            let totalOn = 0;
+            for(let r=0; r<SIZE; r++) {
+                for(let c=0; c<SIZE; c++) {
+                    totalOn += grid[r][c];
+                }
+            }
+            if(totalOn === 0 && !isProcessing) {
+                Swal.fire({
+                    title: "CIRCUIT STABILIZED",
+                    text: "All systems nominal.",
+                    background: '#0a0a0a', color: '#00bfff', icon: 'success',
+                    customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title' }
+                });
+            }
+        }
+
+        function runAI() {
+            if(isProcessing) return;
+            isProcessing = true;
+
+            fetch('/solve_switch', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ grid: grid })
+            })
+            .then(res => res.json())
+            .then(data => {
+                let moves = data.moves;
+                if(moves.length === 0) { isProcessing = false; return; }
+
+                let i = 0;
+                function playNext() {
+                    if(i >= moves.length) {
+                        isProcessing = false;
+                        checkWin();
+                        return;
+                    }
+                    
+                    let move = moves[i];
+                    
+                    // Visual Indicator
+                    let el = document.getElementById(`p-${move.r}-${move.c}`);
+                    el.classList.add('ai-target');
+                    
+                    setTimeout(() => {
+                        el.classList.remove('ai-target');
+                        toggle(move.r, move.c);
+                        i++;
+                        setTimeout(playNext, 200); // Speed of AI
+                    }, 150);
+                }
+                playNext();
+            });
+        }
+
+        function showGuide() {
+            Swal.fire({
+                title: 'MISSION BRIEF',
+                html: `
+                    <ul style="list-style: none; padding: 0; text-align: left;">
+                        <li style="margin-bottom: 10px;">► <strong>GOAL:</strong> Turn OFF all the blue lights.</li>
+                        <li style="margin-bottom: 10px;">► <strong>MECHANIC:</strong> Clicking a panel toggles it AND its adjacent neighbors (Up, Down, Left, Right).</li>
+                        <li style="margin-bottom: 10px;">► <strong>AI ASSIST:</strong> The AI uses a "Light Chasing" algorithm to systematically push all lit panels to the bottom row.</li>
+                    </ul>
+                `,
+                background: '#0a0a0a', color: '#00bfff',
+                confirmButtonText: 'ACKNOWLEDGED',
+                confirmButtonColor: '#00bfff',
+                customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title', content: 'swal-custom-content' }
+            });
+        }
+
+        initGame();
+    </script>
+</body>
+</html>

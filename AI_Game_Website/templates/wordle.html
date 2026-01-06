@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEURAL ARENA | Neon Wordle</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        /* --- CORE STYLES --- */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: #020202; color: #fff; font-family: 'Rajdhani', sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+            min-height: 100vh; overflow-y: auto; padding-top: 20px; padding-bottom: 50px;
+            user-select: none;
+        }
+        #neural-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; background: radial-gradient(circle at center, #1a0033 0%, #000 100%); }
+        .scanlines { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2)); background-size: 100% 4px; pointer-events: none; z-index: -1; opacity: 0.3; }
+
+        .back-btn { position: absolute; top: 30px; left: 30px; text-decoration: none; color: #7f00ff; font-family: 'Orbitron'; font-size: 1rem; border: 1px solid #7f00ff; padding: 10px 20px; border-radius: 5px; transition: 0.3s; background: rgba(127, 0, 255, 0.1); }
+        .back-btn:hover { background-color: #7f00ff; color: #fff; box-shadow: 0 0 25px #7f00ff; }
+
+        h1 { font-family: 'Orbitron'; font-size: 3.5rem; text-shadow: 0 0 20px #7f00ff; color: #7f00ff; margin-bottom: 10px; margin-top: 40px; }
+        
+        /* GRID */
+        #game-board {
+            display: grid;
+            grid-template-rows: repeat(6, 1fr);
+            gap: 5px;
+            margin-bottom: 30px;
+        }
+        .row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+        .tile {
+            width: 60px; height: 60px;
+            border: 2px solid #333;
+            display: flex; align-items: center; justify-content: center;
+            font-family: 'Orbitron'; font-size: 2rem; font-weight: bold;
+            color: #fff; text-transform: uppercase;
+            background: rgba(0,0,0,0.5);
+            transition: transform 0.5s, background 0.5s, border-color 0.5s;
+        }
+        .tile.active { border-color: #7f00ff; box-shadow: 0 0 10px #7f00ff; }
+        .tile.hinted { border-color: #ff00ff; box-shadow: 0 0 15px #ff00ff; color: #ff00ff; } /* New Hint Style */
+        
+        /* COLORS */
+        .correct { background: #00ff00 !important; border-color: #00ff00 !important; color: #000 !important; }
+        .present { background: #ffff00 !important; border-color: #ffff00 !important; color: #000 !important; }
+        .absent { background: #333 !important; border-color: #333 !important; color: #777 !important; }
+
+        /* KEYBOARD */
+        #keyboard { display: flex; flex-direction: column; gap: 8px; align-items: center; }
+        .key-row { display: flex; gap: 6px; }
+        .key {
+            padding: 15px; background: #444; border-radius: 4px;
+            font-family: 'Orbitron'; font-weight: bold; cursor: pointer;
+            min-width: 40px; text-align: center; transition: 0.2s;
+        }
+        .key:hover { background: #666; }
+        .key-big { min-width: 65px; }
+
+        .controls-area { margin-top: 30px; display: flex; gap: 20px; }
+        button {
+            padding: 10px 30px; font-family: 'Orbitron'; font-size: 1rem; color: #fff; background: #7f00ff;
+            border: none; cursor: pointer; border-radius: 5px; box-shadow: 0 0 20px #7f00ff; transition: 0.3s;
+        }
+        button:hover { transform: scale(1.1); box-shadow: 0 0 40px #7f00ff; }
+        
+        /* Hint Button - Distinct Color */
+        .btn-hint { background: transparent; border: 2px solid #ff00ff; color: #ff00ff; box-shadow: none; }
+        .btn-hint:hover { background: #ff00ff; color: #000; box-shadow: 0 0 20px #ff00ff; }
+
+        .btn-guide { background: transparent; border: 2px solid #7f00ff; color: #7f00ff; box-shadow: none;}
+        .btn-guide:hover { background: #7f00ff; color: #fff; }
+
+        .swal-custom-popup { background: #0a0a0a !important; border: 2px solid #7f00ff !important; }
+        .swal-custom-title { color: #7f00ff !important; font-family: 'Orbitron' !important; }
+        .swal-custom-content { color: #ccc !important; font-family: 'Rajdhani' !important; font-size: 1.1rem; text-align: left;}
+    </style>
+</head>
+<body>
+    <canvas id="neural-bg"></canvas>
+    <div class="scanlines"></div>
+
+    <a href="/" class="back-btn">← DASHBOARD</a>
+    <h1>NEON WORDLE</h1>
+
+    <div id="game-board"></div>
+
+    <div id="keyboard">
+        <div class="key-row" id="row1"></div>
+        <div class="key-row" id="row2"></div>
+        <div class="key-row" id="row3"></div>
+    </div>
+
+    <div class="controls-area">
+        <button class="btn-guide" onclick="showGuide()">GUIDE</button>
+        <button class="btn-hint" onclick="giveHint()">GET HINT</button>
+        <button onclick="location.reload()">RESET</button>
+        <button onclick="runAI()">AI SCAN</button>
+    </div>
+
+    <script>
+        const bgCanvas = document.getElementById('neural-bg'); const bgCtx = bgCanvas.getContext('2d');
+        bgCanvas.width = window.innerWidth; bgCanvas.height = window.innerHeight;
+        let particles=[]; class Particle{constructor(){this.x=Math.random()*bgCanvas.width;this.y=Math.random()*bgCanvas.height;this.size=Math.random()*2;this.speedX=(Math.random()*1.0)-0.5;this.speedY=(Math.random()*1.0)-0.5;this.color='#7f00ff';}update(){this.x+=this.speedX;this.y+=this.speedY;if(this.x<0||this.x>bgCanvas.width)this.speedX*=-1;if(this.y<0||this.y>bgCanvas.height)this.speedY*=-1;}draw(){bgCtx.fillStyle=this.color;bgCtx.beginPath();bgCtx.arc(this.x,this.y,this.size,0,Math.PI*2);bgCtx.fill();}}
+        function init(){particles=[];for(let i=0;i<60;i++)particles.push(new Particle());}
+        function animate(){bgCtx.clearRect(0,0,bgCanvas.width,bgCanvas.height);for(let i=0;i<particles.length;i++){particles[i].update();particles[i].draw();connect(i);}requestAnimationFrame(animate);}
+        function connect(a){for(let b=a;b<particles.length;b++){let dist=((particles[a].x-particles[b].x)**2+(particles[a].y-particles[b].y)**2);if(dist<(bgCanvas.width/7)*(bgCanvas.height/7)){bgCtx.strokeStyle='rgba(127, 0, 255,'+(1-dist/25000)+')';bgCtx.lineWidth=1;bgCtx.beginPath();bgCtx.moveTo(particles[a].x,particles[a].y);bgCtx.lineTo(particles[b].x,particles[b].y);bgCtx.stroke();}}}
+        window.addEventListener('resize',()=>{bgCanvas.width=window.innerWidth;bgCanvas.height=window.innerHeight;init();});init();animate();
+    </script>
+
+    <script>
+        const WORDS = [
+            "REACT", "ADIEU", "LATER", "SIREN", "TEARS", "ALONE", "ARISE", "SMART", "STARE", "STORY",
+            "RAISE", "ROAST", "CRANE", "SLATE", "TRACE", "AUDIO", "RADIO", "STONE", "EARTH", "MEDIA",
+            "SPEED", "STEAL", "TRADE", "MODEL", "BLOCK", "BROWN", "BUILD", "CAUSE", "CHECK", "CHEST",
+            "CLAIM", "CLASS", "CLEAN", "CLEAR", "CLIMB", "CLOCK", "CLOSE", "COACH", "COAST", "COUNT",
+            "COURT", "COVER", "CROSS", "CROWD", "CROWN", "CYCLE", "DANCE", "DEATH", "DEPTH", "DOUBT",
+            "DRAFT", "DRAMA", "DREAM", "DRESS", "DRINK", "DRIVE", "EARLY", "ENTRY", "EQUAL", "ERROR",
+            "EVENT", "EXACT", "EXIST", "FAITH", "FAULT", "FIBER", "FIELD", "FINAL", "FLASH", "FLOOR",
+            "FOCUS", "FORCE", "FRAME", "FRANK", "FRONT", "FRUIT", "GLASS", "GRANT", "GRASS", "GREEN",
+            "GROUP", "GUIDE", "HEART", "HEAVY", "HORSE", "HOTEL", "HOUSE", "IMAGE", "INDEX", "INPUT",
+            "ISSUE", "JUDGE", "KNIFE", "LAYER", "LEVEL", "LIGHT", "LIMIT", "LOCAL", "LOGIC", "LUNCH",
+            "MAJOR", "MARCH", "MATCH", "METAL", "MODEL", "MONEY", "MONTH", "MOTOR", "MOUTH", "MUSIC",
+            "NIGHT", "NOISE", "NORTH", "NOVEL", "NURSE", "OFFER", "ORDER", "OTHER", "OWNER", "PANEL",
+            "PAPER", "PARTY", "PEACE", "PHASE", "PHONE", "PIECE", "PILOT", "PITCH", "PLACE", "PLANE",
+            "PLANT", "PLATE", "POINT", "POUND", "POWER", "PRESS", "PRICE", "PRIDE", "PRIZE", "PROOF",
+            "QUEEN", "RADIO", "RANGE", "RATIO", "REPLY", "RIGHT", "RIVER", "ROUND", "ROUTE", "RUGBY",
+            "SCALE", "SCENE", "SCOPE", "SCORE", "SENSE", "SHAPE", "SHARE", "SHEEP", "SHEET", "SHIFT",
+            "SHIRT", "SHOCK", "SHOOT", "SHORT", "SIGHT", "SKILL", "SLEEP", "SMALL", "SMILE", "SMOKE",
+            "SOLID", "SOLVE", "SOUND", "SOUTH", "SPACE", "SPARE", "SPEAK", "SPEED", "SPITE", "SPORT",
+            "SQUAD", "STACK", "STAFF", "STAGE", "STAND", "START", "STATE", "STEAM", "STEEL", "STICK",
+            "STILL", "STOCK", "STONE", "STORE", "STUDY", "STUFF", "STYLE", "SUGAR", "TABLE", "TASTE",
+            "TEACH", "THANK", "THEME", "THING", "THINK", "THROW", "TITLE", "TOTAL", "TOUCH", "TOWER",
+            "TRACK", "TRADE", "TRAIN", "TREAT", "TRUCK", "TRUST", "TRUTH", "UNCLE", "UNION", "UNITY",
+            "VALUE", "VIDEO", "VISIT", "VOICE", "WASTE", "WATCH", "WATER", "WHILE", "WHITE", "WHOLE",
+            "WOMAN", "WORLD", "WORRY", "WRITE", "WRONG", "YOUTH", "ZEBRA", "ROBOT", "ALIEN", "LASER"
+        ];
+
+        let targetWord = WORDS[Math.floor(Math.random() * WORDS.length)];
+        let currentRow = 0;
+        let currentTile = 0;
+        let isGameOver = false;
+        let guesses = []; 
+
+        // Init Grid
+        const board = document.getElementById('game-board');
+        for(let r=0; r<6; r++) {
+            let row = document.createElement('div');
+            row.className = 'row';
+            for(let c=0; c<5; c++) {
+                let tile = document.createElement('div');
+                tile.className = 'tile';
+                tile.id = `tile-${r}-${c}`;
+                row.appendChild(tile);
+            }
+            board.appendChild(row);
+        }
+
+        // Init Keyboard
+        const keys1 = "QWERTYUIOP".split("");
+        const keys2 = "ASDFGHJKL".split("");
+        const keys3 = ["ENTER", "Z", "X", "C", "V", "B", "N", "M", "⌫"];
+        
+        function createKeys(arr, rowId) {
+            let container = document.getElementById(rowId);
+            arr.forEach(k => {
+                let btn = document.createElement('div');
+                btn.className = 'key';
+                if(k.length > 1) btn.classList.add('key-big');
+                btn.innerText = k;
+                btn.onclick = () => handleInput(k);
+                btn.id = `key-${k}`;
+                container.appendChild(btn);
+            });
+        }
+        createKeys(keys1, 'row1');
+        createKeys(keys2, 'row2');
+        createKeys(keys3, 'row3');
+
+        // Input Handler
+        function handleInput(key) {
+            if(isGameOver) return;
+
+            if(key === '⌫') {
+                if(currentTile > 0) {
+                    currentTile--;
+                    let tile = document.getElementById(`tile-${currentRow}-${currentTile}`);
+                    tile.innerText = '';
+                    tile.classList.remove('active');
+                    tile.classList.remove('hinted');
+                }
+            } else if(key === 'ENTER') {
+                if(currentTile === 5) checkRow();
+            } else {
+                if(currentTile < 5) {
+                    let tile = document.getElementById(`tile-${currentRow}-${currentTile}`);
+                    tile.innerText = key;
+                    tile.classList.add('active');
+                    currentTile++;
+                }
+            }
+        }
+
+        // Check Logic
+        function checkRow() {
+            let guess = '';
+            for(let i=0; i<5; i++) {
+                guess += document.getElementById(`tile-${currentRow}-${i}`).innerText;
+            }
+
+            if(!WORDS.includes(guess)) {
+                Swal.fire({
+                    title: 'INVALID WORD',
+                    text: 'Word not in database.',
+                    background: '#0a0a0a', color: '#fff', timer: 1000, showConfirmButton: false,
+                    customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title' }
+                });
+                return;
+            }
+
+            // Color Logic
+            let targetArr = targetWord.split('');
+            let guessArr = guess.split('');
+            let colors = new Array(5).fill('absent');
+
+            // 1. Check Greens
+            for(let i=0; i<5; i++) {
+                if(guessArr[i] === targetArr[i]) {
+                    colors[i] = 'correct';
+                    targetArr[i] = null; // Mark as used
+                    guesses.push({letter: guessArr[i], index: i, status: 'correct'});
+                }
+            }
+
+            // 2. Check Yellows
+            for(let i=0; i<5; i++) {
+                if(colors[i] !== 'correct' && targetArr.includes(guessArr[i])) {
+                    colors[i] = 'present';
+                    targetArr[targetArr.indexOf(guessArr[i])] = null; // Mark as used
+                    guesses.push({letter: guessArr[i], index: i, status: 'present'});
+                } else if(colors[i] !== 'correct') {
+                    guesses.push({letter: guessArr[i], index: i, status: 'absent'});
+                }
+            }
+
+            // Apply Animations & Colors
+            for(let i=0; i<5; i++) {
+                let tile = document.getElementById(`tile-${currentRow}-${i}`);
+                let key = document.getElementById(`key-${guessArr[i]}`);
+                setTimeout(() => {
+                    tile.classList.add(colors[i]);
+                    tile.classList.remove('active', 'hinted');
+                    tile.style.transform = "rotateX(360deg)";
+                    
+                    if(!key.classList.contains('correct')) {
+                        key.className = `key ${colors[i]}`;
+                    }
+                }, i * 100);
+            }
+
+            if(guess === targetWord) {
+                setTimeout(() => endGame(true), 1500);
+            } else if(currentRow === 5) {
+                setTimeout(() => endGame(false), 1500);
+            } else {
+                currentRow++;
+                currentTile = 0;
+            }
+        }
+
+        function giveHint() {
+            if(isGameOver || currentTile === 5) return;
+            
+            // Get correct letter for current slot
+            let correctChar = targetWord[currentTile];
+            
+            // Visually insert it
+            let tile = document.getElementById(`tile-${currentRow}-${currentTile}`);
+            tile.innerText = correctChar;
+            tile.classList.add('active');
+            tile.classList.add('hinted'); // Add neon pink border to indicate hint
+            currentTile++;
+        }
+
+        function endGame(win) {
+            isGameOver = true;
+            Swal.fire({
+                title: win ? "ACCESS GRANTED" : "ACCESS DENIED",
+                text: win ? "Password Decrypted." : `The word was ${targetWord}.`,
+                icon: win ? "success" : "error",
+                background: '#0a0a0a', color: win ? '#00ff00' : '#ff0055',
+                confirmButtonText: 'RESTART',
+                customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title' }
+            }).then(() => location.reload());
+        }
+
+        function showGuide() {
+            Swal.fire({
+                title: 'MISSION BRIEF',
+                html: `
+                    <ul style="list-style: none; padding: 0; text-align: left;">
+                        <li style="margin-bottom: 10px;">► <strong>OBJECTIVE:</strong> Guess the 5-letter word in 6 tries.</li>
+                        <li style="margin-bottom: 10px;">► <strong>COLORS:</strong>
+                            <br><span style="color: #00ff00">GREEN</span> = Correct Letter, Correct Spot.
+                            <br><span style="color: #ffff00">YELLOW</span> = Correct Letter, Wrong Spot.
+                            <br><span style="color: #777">GRAY</span> = Wrong Letter.
+                        </li>
+                        <li style="margin-bottom: 10px;">► <strong>AI ASSIST:</strong> The AI uses Information Theory to guess for you.</li>
+                        <li style="margin-bottom: 10px;">► <strong>HINT:</strong> Click "GET HINT" to reveal the next correct letter.</li>
+                    </ul>
+                `,
+                background: '#0a0a0a', color: '#7f00ff',
+                confirmButtonText: 'ACKNOWLEDGED',
+                confirmButtonColor: '#7f00ff',
+                customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title', content: 'swal-custom-content' }
+            });
+        }
+
+        // --- AI LOGIC ---
+        function runAI() {
+            if(isGameOver) return;
+            
+            fetch('/solve_wordle', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ constraints: guesses })
+            })
+            .then(res => res.json())
+            .then(data => {
+                let aiWord = data.guess;
+                currentTile = 0;
+                // Clear row
+                for(let i=0; i<5; i++) {
+                    let tile = document.getElementById(`tile-${currentRow}-${i}`);
+                    tile.innerText = '';
+                    tile.classList.remove('active', 'hinted');
+                }
+                
+                aiWord.split('').forEach(char => handleInput(char));
+                setTimeout(checkRow, 500);
+            });
+        }
+
+        document.addEventListener('keydown', (e) => {
+            let k = e.key.toUpperCase();
+            if(k === 'ENTER' || k === 'BACKSPACE') handleInput(k === 'BACKSPACE' ? '⌫' : 'ENTER');
+            else if(k.length === 1 && k.match(/[A-Z]/)) handleInput(k);
+        });
+
+    </script>
+</body>
+</html>

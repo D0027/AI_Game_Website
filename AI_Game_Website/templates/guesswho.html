@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEURAL ARENA | Neon Prophet</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        /* --- CORE STYLES --- */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: #020202; color: #fff; font-family: 'Rajdhani', sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            min-height: 100vh; overflow-y: auto; padding-top: 20px; padding-bottom: 50px;
+            user-select: none;
+        }
+        #neural-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; background: radial-gradient(circle at center, #1a1a1a 0%, #000 100%); }
+        .scanlines { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2)); background-size: 100% 4px; pointer-events: none; z-index: -1; opacity: 0.3; }
+
+        .back-btn { position: absolute; top: 30px; left: 30px; text-decoration: none; color: #fff; font-family: 'Orbitron'; font-size: 1rem; border: 1px solid #fff; padding: 10px 20px; border-radius: 5px; transition: 0.3s; background: rgba(255, 255, 255, 0.1); }
+        .back-btn:hover { background-color: #fff; color: #000; box-shadow: 0 0 25px #fff; }
+
+        h1 { font-family: 'Orbitron'; font-size: 3.5rem; text-shadow: 0 0 20px #fff; color: #fff; margin-bottom: 40px; }
+
+        .terminal-box {
+            width: 700px; min-height: 300px;
+            background: rgba(10, 10, 10, 0.9);
+            border: 2px solid #fff;
+            box-shadow: 0 0 40px rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 40px;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            position: relative;
+        }
+
+        .question-text {
+            font-family: 'Orbitron'; font-size: 1.8rem; color: #fff;
+            text-align: center; line-height: 1.5; min-height: 100px;
+            text-shadow: 0 0 10px #fff;
+        }
+
+        .options-area {
+            margin-top: 40px; display: flex; gap: 40px; opacity: 0; transition: opacity 0.5s;
+        }
+        .options-area.visible { opacity: 1; }
+
+        .btn-option {
+            padding: 15px 50px; font-family: 'Orbitron'; font-size: 1.2rem;
+            color: #000; background: #fff; border: none; cursor: pointer;
+            border-radius: 5px; box-shadow: 0 0 20px #fff; transition: 0.3s;
+        }
+        .btn-option:hover { transform: scale(1.1); box-shadow: 0 0 40px #fff; background: #e0e0e0; }
+        
+        .btn-no { background: #333; color: #fff; border: 1px solid #fff; box-shadow: none; }
+        .btn-no:hover { background: #fff; color: #000; box-shadow: 0 0 20px #fff; }
+
+        .character-grid {
+            margin-top: 30px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; max-width: 800px;
+        }
+        .char-tag {
+            background: rgba(255,255,255,0.1); padding: 5px 10px; font-size: 0.8rem;
+            border: 1px solid #555; color: #777; border-radius: 3px;
+        }
+
+        /* Cursor Effect */
+        .cursor { display: inline-block; width: 10px; height: 1.8rem; background: #fff; animation: blink 1s infinite; margin-left: 5px; vertical-align: bottom;}
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+        .swal-custom-popup { background: #0a0a0a !important; border: 2px solid #fff !important; }
+        .swal-custom-title { color: #fff !important; font-family: 'Orbitron' !important; }
+    </style>
+</head>
+<body>
+    <canvas id="neural-bg"></canvas>
+    <div class="scanlines"></div>
+
+    <a href="/" class="back-btn">← DASHBOARD</a>
+    <h1>NEON PROPHET</h1>
+
+    <div class="terminal-box">
+        <div class="question-text" id="qText">INITIALIZING NEURAL LINK...</div>
+        <div class="options-area" id="options">
+            <button class="btn-option" onclick="answer('yes')">YES</button>
+            <button class="btn-option btn-no" onclick="answer('no')">NO</button>
+        </div>
+    </div>
+
+    <div class="character-grid">
+        <div class="char-tag">THE SOLDIER</div>
+        <div class="char-tag">THE NINJA</div>
+        <div class="char-tag">THE HACKER</div>
+        <div class="char-tag">THE CIVILIAN</div>
+        <div class="char-tag">THE TERMINATOR</div>
+        <div class="char-tag">THE BUTLER BOT</div>
+        <div class="char-tag">THE DRONE</div>
+        <div class="char-tag">THE AI CORE</div>
+    </div>
+
+    <script>
+        const bgCanvas = document.getElementById('neural-bg'); const bgCtx = bgCanvas.getContext('2d');
+        bgCanvas.width = window.innerWidth; bgCanvas.height = window.innerHeight;
+        let particles=[]; class Particle{constructor(){this.x=Math.random()*bgCanvas.width;this.y=Math.random()*bgCanvas.height;this.size=Math.random()*2;this.speedX=(Math.random()*0.5)-0.25;this.speedY=(Math.random()*0.5)-0.25;this.color='#ffffff';}update(){this.x+=this.speedX;this.y+=this.speedY;if(this.x<0||this.x>bgCanvas.width)this.speedX*=-1;if(this.y<0||this.y>bgCanvas.height)this.speedY*=-1;}draw(){bgCtx.fillStyle=this.color;bgCtx.beginPath();bgCtx.arc(this.x,this.y,this.size,0,Math.PI*2);bgCtx.fill();}}
+        function init(){particles=[];for(let i=0;i<60;i++)particles.push(new Particle());}
+        function animate(){bgCtx.clearRect(0,0,bgCanvas.width,bgCanvas.height);for(let i=0;i<particles.length;i++){particles[i].update();particles[i].draw();connect(i);}requestAnimationFrame(animate);}
+        function connect(a){for(let b=a;b<particles.length;b++){let dist=((particles[a].x-particles[b].x)**2+(particles[a].y-particles[b].y)**2);if(dist<(bgCanvas.width/7)*(bgCanvas.height/7)){bgCtx.strokeStyle='rgba(255, 255, 255,'+(1-dist/25000)+')';bgCtx.lineWidth=1;bgCtx.beginPath();bgCtx.moveTo(particles[a].x,particles[a].y);bgCtx.lineTo(particles[b].x,particles[b].y);bgCtx.stroke();}}}
+        window.addEventListener('resize',()=>{bgCanvas.width=window.innerWidth;bgCanvas.height=window.innerHeight;init();});init();animate();
+    </script>
+
+    <script>
+        let currentNode = null;
+        let isTyping = false;
+
+        function startSession() {
+            fetch('/query_tree', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ answer: null })
+            })
+            .then(res => res.json())
+            .then(data => {
+                currentNode = data.node;
+                typeWriter(data.text);
+            });
+        }
+
+        function answer(response) {
+            if(isTyping) return; // Prevent clicking while typing
+            
+            document.getElementById('options').classList.remove('visible');
+            
+            fetch('/query_tree', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ node: currentNode, answer: response })
+            })
+            .then(res => res.json())
+            .then(data => {
+                currentNode = data.node;
+                if(data.is_guess) {
+                    typeWriter(data.text, true); // True = End Game Flow
+                } else {
+                    typeWriter(data.text);
+                }
+            });
+        }
+
+        function typeWriter(text, isEnd = false) {
+            isTyping = true;
+            const el = document.getElementById('qText');
+            el.innerHTML = '<span class="cursor"></span>';
+            let i = 0;
+            let speed = 30; // ms per char
+
+            function type() {
+                if (i < text.length) {
+                    el.innerHTML = text.substring(0, i+1) + '<span class="cursor"></span>';
+                    i++;
+                    setTimeout(type, speed);
+                } else {
+                    isTyping = false;
+                    if(isEnd) {
+                        setTimeout(() => showResult(text), 500);
+                    } else {
+                        document.getElementById('options').classList.add('visible');
+                    }
+                }
+            }
+            type();
+        }
+
+        function showResult(text) {
+            Swal.fire({
+                title: text,
+                text: "Was the Neural Network correct?",
+                background: '#0a0a0a', color: '#fff',
+                showCancelButton: true,
+                confirmButtonText: 'YES (Correct)',
+                cancelButtonText: 'NO (Wrong)',
+                confirmButtonColor: '#fff',
+                cancelButtonColor: '#333',
+                customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title' }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    Swal.fire({
+                        title: "PREDICTION VERIFIED",
+                        icon: "success",
+                        background: '#0a0a0a', color: '#fff',
+                        confirmButtonColor: '#fff',
+                        customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title' }
+                    }).then(() => location.reload());
+                } else {
+                    Swal.fire({
+                        title: "RECALIBRATING...",
+                        text: "Data anomaly detected.",
+                        icon: "info",
+                        background: '#0a0a0a', color: '#fff',
+                        confirmButtonColor: '#fff',
+                        customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title' }
+                    }).then(() => location.reload());
+                }
+            });
+        }
+
+        // Initialize
+        setTimeout(startSession, 1000);
+    </script>
+</body>
+</html>

@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEURAL ARENA | Tic-Tac-Toe</title>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* --- ADVANCED UI STYLES --- */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: #020202; color: #fff; font-family: 'Rajdhani', sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            min-height: 100vh; overflow: hidden;
+        }
+
+        /* --- BACKGROUND EFFECTS --- */
+        #neural-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; background: radial-gradient(circle at center, #0a0a0a 0%, #000 100%); }
+        .scanlines { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2)); background-size: 100% 4px; pointer-events: none; z-index: -1; opacity: 0.3; }
+
+        /* --- UI ELEMENTS --- */
+        .back-btn { 
+            position: absolute; top: 30px; left: 30px; text-decoration: none; 
+            color: #00ffcc; font-family: 'Orbitron', sans-serif; font-size: 1rem; 
+            border: 1px solid #00ffcc; padding: 10px 20px; border-radius: 5px; 
+            transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 2px; 
+            backdrop-filter: blur(5px); background: rgba(0, 255, 204, 0.1); 
+        }
+        .back-btn:hover { background-color: #00ffcc; color: #050505; box-shadow: 0 0 25px #00ffcc; }
+
+        h1 { 
+            font-family: 'Orbitron', sans-serif; font-size: 4rem; font-weight: 900; 
+            text-shadow: 0 0 20px #00ffcc, 0 0 40px #00ffcc; letter-spacing: 5px; 
+            margin-bottom: 20px; text-transform: uppercase; color: #fff; 
+        }
+
+        #status { 
+            font-size: 1.8rem; margin-bottom: 25px; color: #ff00ff; 
+            text-shadow: 0 0 10px #ff00ff; min-height: 1.5em; 
+            font-weight: 600; font-family: 'Orbitron'; letter-spacing: 2px; 
+        }
+
+        /* --- GLASS BOARD --- */
+        .board {
+            display: grid; grid-template-columns: repeat(3, 110px); grid-template-rows: repeat(3, 110px); gap: 10px;
+            background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(15px);
+            padding: 20px; border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        }
+
+        .cell {
+            background-color: rgba(0,0,0,0.3); border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px; display: flex; align-items: center; justify-content: center;
+            font-size: 4.5rem; font-family: 'Orbitron', sans-serif; font-weight: bold;
+            cursor: pointer; box-shadow: inset 0 0 20px rgba(0,0,0,0.2); transition: all 0.3s ease;
+        }
+
+        .cell:hover { 
+            border-color: #00ffcc; 
+            box-shadow: inset 0 0 30px rgba(0, 255, 204, 0.2), 0 0 20px rgba(0, 255, 204, 0.4); 
+        }
+
+        /* --- PLAYERS --- */
+        .x-move { color: #00ffcc; text-shadow: 0 0 25px #00ffcc; animation: flicker 1.5s infinite alternate; }
+        .o-move { color: #ff00ff; text-shadow: 0 0 25px #ff00ff; animation: flicker 1.5s infinite alternate-reverse; }
+        @keyframes flicker { 0%, 100% { opacity: 1; } 50% { opacity: 0.8; } }
+
+        /* --- WINNING ANIMATION --- */
+        .winning-cell { 
+            background-color: rgba(255, 255, 255, 0.1) !important; 
+            border-color: #fff !important; 
+            animation: pulseWin 0.8s infinite alternate; 
+        }
+        @keyframes pulseWin { 
+            0% { box-shadow: 0 0 10px #fff; } 
+            100% { box-shadow: 0 0 40px #fff, inset 0 0 20px #fff; } 
+        }
+
+        /* --- RESTART BUTTON --- */
+        .restart-btn { 
+            margin-top: 40px; padding: 12px 40px; 
+            font-family: 'Orbitron', sans-serif; font-size: 1.3rem; font-weight: 700; 
+            color: #050505; background-color: #00ffcc; border: none; border-radius: 5px; 
+            box-shadow: 0 0 25px #00ffcc; cursor: pointer; 
+            transition: transform 0.2s, box-shadow 0.2s; letter-spacing: 2px; 
+        }
+        .restart-btn:hover { 
+            transform: scale(1.05); background-color: #fff; box-shadow: 0 0 50px #00ffcc; 
+        }
+        
+        /* --- POPUP --- */
+        .swal-custom-popup { 
+            background: rgba(10, 10, 10, 0.95) !important; 
+            backdrop-filter: blur(10px) !important; 
+            border: 2px solid #00ffcc !important; 
+            box-shadow: 0 0 50px rgba(0, 255, 204, 0.3) !important; 
+        }
+        .swal-custom-title { 
+            color: #00ffcc !important; 
+            font-family: 'Orbitron', sans-serif !important; 
+            text-shadow: 0 0 15px #00ffcc !important; 
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="neural-bg"></canvas>
+    <div class="scanlines"></div>
+
+    <a href="/" class="back-btn">← Main Menu</a>
+
+    <h1>NEON TIC-TAC-TOE</h1>
+    <div id="status">YOUR TURN (X)</div>
+
+    <div class="board" id="board">
+        <div class="cell" onclick="makeMove(0)"></div>
+        <div class="cell" onclick="makeMove(1)"></div>
+        <div class="cell" onclick="makeMove(2)"></div>
+        <div class="cell" onclick="makeMove(3)"></div>
+        <div class="cell" onclick="makeMove(4)"></div>
+        <div class="cell" onclick="makeMove(5)"></div>
+        <div class="cell" onclick="makeMove(6)"></div>
+        <div class="cell" onclick="makeMove(7)"></div>
+        <div class="cell" onclick="makeMove(8)"></div>
+    </div>
+
+    <button class="restart-btn" onclick="resetGame()">RESTART SYSTEM</button>
+
+    <script>
+        const canvas = document.getElementById('neural-bg'); const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+        let particlesArray; class Particle { constructor() { this.x = Math.random() * canvas.width; this.y = Math.random() * canvas.height; this.size = Math.random() * 2; this.speedX = (Math.random() * 1.5) - 0.75; this.speedY = (Math.random() * 1.5) - 0.75; this.color = '#00ffcc'; } update() { this.x += this.speedX; this.y += this.speedY; if (this.x < 0 || this.x > canvas.width) this.speedX *= -1; if (this.y < 0 || this.y > canvas.height) this.speedY *= -1; } draw() { ctx.fillStyle = this.color; ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fill(); } }
+        function init() { particlesArray = []; let numberOfParticles = (canvas.height * canvas.width) / 12000; for (let i = 0; i < numberOfParticles; i++) { particlesArray.push(new Particle()); } }
+        function animate() { ctx.clearRect(0, 0, canvas.width, canvas.height); for (let i = 0; i < particlesArray.length; i++) { particlesArray[i].update(); particlesArray[i].draw(); connect(i); } requestAnimationFrame(animate); }
+        function connect(a) { for (let b = a; b < particlesArray.length; b++) { let distance = ((particlesArray[a].x - particlesArray[b].x) * (particlesArray[a].x - particlesArray[b].x)) + ((particlesArray[a].y - particlesArray[b].y) * (particlesArray[a].y - particlesArray[b].y)); if (distance < (canvas.width/9) * (canvas.height/9)) { let opacityValue = 1 - (distance / 20000); ctx.strokeStyle = 'rgba(0, 255, 204,' + opacityValue + ')'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(particlesArray[a].x, particlesArray[a].y); ctx.lineTo(particlesArray[b].x, particlesArray[b].y); ctx.stroke(); } } }
+        window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; init(); }); init(); animate();
+    </script>
+
+    <script>
+        let currentPlayer = 'X';
+        let gameActive = true;
+        let boardState = ["", "", "", "", "", "", "", "", ""];
+
+        const winningConditions = [
+            [0, 1, 2], [3, 4, 5], [6, 7, 8], // Rows
+            [0, 3, 6], [1, 4, 7], [2, 5, 8], // Columns
+            [0, 4, 8], [2, 4, 6]             // Diagonals
+        ];
+
+        function makeMove(index) {
+            if (boardState[index] === "" && gameActive && currentPlayer === 'X') {
+                updateBoard(index, 'X');
+                if (checkWinner()) return;
+
+                currentPlayer = 'O'; 
+                document.getElementById('status').innerText = "AI COMPUTING...";
+                document.getElementById('status').style.color = "#ff00ff";
+
+                fetch('/move', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ board: boardState })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.index !== null && gameActive) {
+                        setTimeout(() => {
+                            updateBoard(data.index, 'O');
+                            if (!checkWinner()) {
+                                currentPlayer = 'X';
+                                document.getElementById('status').innerText = "YOUR TURN (X)";
+                                document.getElementById('status').style.color = "#00ffcc";
+                            }
+                        }, 600);
+                    } else if (!gameActive) {
+                    } else {
+                        checkWinner();
+                    }
+                });
+            }
+        }
+
+        function updateBoard(index, player) {
+            boardState[index] = player;
+            const cells = document.querySelectorAll('.cell');
+            cells[index].innerText = player;
+            cells[index].classList.add(player === 'X' ? 'x-move' : 'o-move');
+        }
+
+        function checkWinner() {
+            let roundWon = false;
+            let winningCombo = [];
+
+            for (let i = 0; i <= 7; i++) {
+                const winCondition = winningConditions[i];
+                let a = boardState[winCondition[0]];
+                let b = boardState[winCondition[1]];
+                let c = boardState[winCondition[2]];
+                if (a === '' || b === '' || c === '') continue;
+                if (a === b && b === c) {
+                    roundWon = true;
+                    winningCombo = winCondition;
+                    break;
+                }
+            }
+
+            if (roundWon) {
+                gameActive = false;
+                highlightWinner(winningCombo);
+                let message = currentPlayer === 'X' ? "SYSTEM DEFEATED!" : "SYSTEM WINS!";
+                let icon = currentPlayer === 'X' ? "success" : "error";
+                
+                document.getElementById('status').innerText = message;
+                
+                setTimeout(() => {
+                    Swal.fire({
+                        title: message,
+                        text: currentPlayer === 'X' ? "You have beaten the AI!" : "Advanced Intelligence prevails.",
+                        icon: icon,
+                        background: '#0a0a0a',
+                        color: '#00ffcc',
+                        confirmButtonColor: '#3085d6',
+                        confirmButtonText: 'PLAY AGAIN',
+                        customClass: {
+                            popup: 'swal-custom-popup',
+                            title: 'swal-custom-title'
+                        }
+                    }).then(() => resetGame());
+                }, 500);
+                return true;
+            }
+
+            if (!boardState.includes("")) {
+                gameActive = false;
+                document.getElementById('status').innerText = "SYSTEM DRAW";
+                Swal.fire({
+                    title: 'DRAW',
+                    text: 'Perfect balance achieved.',
+                    icon: 'info',
+                    background: '#0a0a0a',
+                    color: '#fff',
+                    confirmButtonText: 'RESET',
+                    customClass: { popup: 'swal-custom-popup' }
+                }).then(() => resetGame());
+                return true;
+            }
+            return false;
+        }
+
+        function highlightWinner(combo) {
+            const cells = document.querySelectorAll('.cell');
+            combo.forEach(index => {
+                cells[index].classList.add('winning-cell');
+            });
+        }
+
+        function resetGame() {
+            boardState = ["", "", "", "", "", "", "", "", ""];
+            gameActive = true;
+            currentPlayer = 'X';
+            document.getElementById('status').innerText = "YOUR TURN (X)";
+            document.getElementById('status').style.color = "#00ffcc";
+            const cells = document.querySelectorAll('.cell');
+            cells.forEach(cell => {
+                cell.innerText = "";
+                cell.className = "cell"; 
+            });
+        }
+    </script>
+</body>
+</html>

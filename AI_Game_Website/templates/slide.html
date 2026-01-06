@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEURAL ARENA | Neon Slide</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        /* --- CORE STYLES --- */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: #020202; color: #fff; font-family: 'Rajdhani', sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+            min-height: 100vh; overflow-y: auto; padding-top: 20px; padding-bottom: 50px;
+            user-select: none;
+        }
+        #neural-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; background: radial-gradient(circle at center, #00001a 0%, #000 100%); }
+        .scanlines { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2)); background-size: 100% 4px; pointer-events: none; z-index: -1; opacity: 0.3; }
+
+        .back-btn { position: absolute; top: 30px; left: 30px; text-decoration: none; color: #4d4dff; font-family: 'Orbitron'; font-size: 1rem; border: 1px solid #4d4dff; padding: 10px 20px; border-radius: 5px; transition: 0.3s; background: rgba(77, 77, 255, 0.1); }
+        .back-btn:hover { background-color: #4d4dff; color: #fff; box-shadow: 0 0 25px #4d4dff; }
+
+        h1 { font-family: 'Orbitron'; font-size: 3.5rem; text-shadow: 0 0 20px #4d4dff; color: #4d4dff; margin-bottom: 30px; margin-top: 40px; }
+
+        #board {
+            width: 310px; height: 310px;
+            background: rgba(10, 10, 30, 0.9);
+            border: 2px solid #4d4dff;
+            border-radius: 10px;
+            position: relative;
+            box-shadow: 0 0 40px rgba(77, 77, 255, 0.2);
+        }
+
+        .tile {
+            width: 90px; height: 90px;
+            background: rgba(77, 77, 255, 0.1);
+            border: 2px solid #4d4dff;
+            color: #fff;
+            font-family: 'Orbitron'; font-size: 2.5rem;
+            display: flex; align-items: center; justify-content: center;
+            position: absolute;
+            transition: top 0.2s, left 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+            border-radius: 5px;
+            box-shadow: 0 0 15px rgba(77, 77, 255, 0.1);
+        }
+        
+        .tile:hover { background: #4d4dff; color: #000; box-shadow: 0 0 25px #4d4dff; }
+        .tile.ai-move { border-color: #fff; box-shadow: 0 0 25px #fff; background: rgba(255,255,255,0.2); }
+
+        .controls-area { margin-top: 30px; display: flex; gap: 20px; }
+        button {
+            padding: 10px 30px; font-family: 'Orbitron'; font-size: 1rem; color: #fff; background: #4d4dff;
+            border: none; cursor: pointer; border-radius: 5px; box-shadow: 0 0 20px #4d4dff; transition: 0.3s;
+        }
+        button:hover { transform: scale(1.1); box-shadow: 0 0 40px #4d4dff; }
+        .btn-guide { background: transparent; border: 2px solid #4d4dff; color: #4d4dff; }
+        .btn-guide:hover { background: #4d4dff; color: #fff; }
+
+        .swal-custom-popup { background: #0a0a0a !important; border: 2px solid #4d4dff !important; }
+        .swal-custom-title { color: #4d4dff !important; font-family: 'Orbitron' !important; }
+        .swal-custom-content { color: #ccc !important; font-family: 'Rajdhani' !important; font-size: 1.1rem; text-align: left;}
+    </style>
+</head>
+<body>
+    <canvas id="neural-bg"></canvas>
+    <div class="scanlines"></div>
+
+    <a href="/" class="back-btn">← DASHBOARD</a>
+    <h1>NEON SLIDE</h1>
+
+    <div id="board"></div>
+
+    <div class="controls-area">
+        <button class="btn-guide" onclick="showGuide()">MISSION BRIEF</button>
+        <button onclick="scramble()">SCRAMBLE</button>
+        <button onclick="runAI()">AI SOLVE</button>
+    </div>
+
+    <script>
+        const bgCanvas = document.getElementById('neural-bg'); const bgCtx = bgCanvas.getContext('2d');
+        bgCanvas.width = window.innerWidth; bgCanvas.height = window.innerHeight;
+        let particles=[]; class Particle{constructor(){this.x=Math.random()*bgCanvas.width;this.y=Math.random()*bgCanvas.height;this.size=Math.random()*2;this.speedX=(Math.random()*1.0)-0.5;this.speedY=(Math.random()*1.0)-0.5;this.color='#4d4dff';}update(){this.x+=this.speedX;this.y+=this.speedY;if(this.x<0||this.x>bgCanvas.width)this.speedX*=-1;if(this.y<0||this.y>bgCanvas.height)this.speedY*=-1;}draw(){bgCtx.fillStyle=this.color;bgCtx.beginPath();bgCtx.arc(this.x,this.y,this.size,0,Math.PI*2);bgCtx.fill();}}
+        function initBg(){particles=[];for(let i=0;i<60;i++)particles.push(new Particle());}
+        function animateBg(){bgCtx.clearRect(0,0,bgCanvas.width,bgCanvas.height);for(let i=0;i<particles.length;i++){particles[i].update();particles[i].draw();connect(i);}requestAnimationFrame(animateBg);}
+        function connect(a){for(let b=a;b<particles.length;b++){let dist=((particles[a].x-particles[b].x)**2+(particles[a].y-particles[b].y)**2);if(dist<(bgCanvas.width/7)*(bgCanvas.height/7)){bgCtx.strokeStyle='rgba(77, 77, 255,'+(1-dist/25000)+')';bgCtx.lineWidth=1;bgCtx.beginPath();bgCtx.moveTo(particles[a].x,particles[a].y);bgCtx.lineTo(particles[b].x,particles[b].y);bgCtx.stroke();}}}
+        window.addEventListener('resize',()=>{bgCanvas.width=window.innerWidth;bgCanvas.height=window.innerHeight;initBg();});initBg(); animateBg();
+    </script>
+
+    <script>
+        const boardEl = document.getElementById('board');
+        let tiles = [1, 2, 3, 4, 5, 6, 7, 8, 0]; // 0 is empty
+        let isProcessing = false;
+
+        function renderBoard() {
+            boardEl.innerHTML = '';
+            for(let i=0; i<9; i++) {
+                let val = tiles[i];
+                if(val !== 0) {
+                    let tile = document.createElement('div');
+                    tile.className = 'tile';
+                    tile.innerText = val;
+                    tile.id = `tile-${val}`;
+                    
+                    // Calculate Position (10px padding + 90px size + 10px gap)
+                    let r = Math.floor(i / 3);
+                    let c = i % 3;
+                    tile.style.top = (10 + r * 100) + 'px';
+                    tile.style.left = (10 + c * 100) + 'px';
+                    
+                    tile.onclick = () => moveTile(i);
+                    boardEl.appendChild(tile);
+                }
+            }
+        }
+
+        function moveTile(index) {
+            if(isProcessing) return;
+
+            // Find empty slot (0)
+            let zeroIdx = tiles.indexOf(0);
+            
+            // Check adjacency
+            let r1 = Math.floor(index / 3), c1 = index % 3;
+            let r2 = Math.floor(zeroIdx / 3), c2 = zeroIdx % 3;
+            
+            if(Math.abs(r1 - r2) + Math.abs(c1 - c2) === 1) {
+                // Swap
+                [tiles[index], tiles[zeroIdx]] = [tiles[zeroIdx], tiles[index]];
+                renderBoard();
+                checkWin();
+            }
+        }
+
+        function checkWin() {
+            let win = true;
+            for(let i=0; i<8; i++) {
+                if(tiles[i] !== i+1) win = false;
+            }
+            if(win && !isProcessing) {
+                Swal.fire({
+                    title: "SEQUENCE COMPLETE",
+                    text: "System Reordered.",
+                    background: '#0a0a0a', color: '#4d4dff', icon: 'success',
+                    customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title' }
+                });
+            }
+        }
+
+        function scramble() {
+            if(isProcessing) return;
+            // Scramble by making valid moves backwards (guarantees solvability)
+            let moves = 50;
+            let interval = setInterval(() => {
+                let zeroIdx = tiles.indexOf(0);
+                let r = Math.floor(zeroIdx / 3);
+                let c = zeroIdx % 3;
+                let neighbors = [];
+                
+                if(r > 0) neighbors.push(zeroIdx - 3);
+                if(r < 2) neighbors.push(zeroIdx + 3);
+                if(c > 0) neighbors.push(zeroIdx - 1);
+                if(c < 2) neighbors.push(zeroIdx + 1);
+                
+                let randomIdx = neighbors[Math.floor(Math.random() * neighbors.length)];
+                
+                // Swap in data
+                [tiles[zeroIdx], tiles[randomIdx]] = [tiles[randomIdx], tiles[zeroIdx]];
+                renderBoard();
+                
+                moves--;
+                if(moves <= 0) clearInterval(interval);
+            }, 20);
+        }
+
+        function runAI() {
+            if(isProcessing) return;
+            isProcessing = true;
+
+            fetch('/solve_slide', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ grid: tiles })
+            })
+            .then(res => res.json())
+            .then(data => {
+                let moves = data.moves;
+                if(moves.length === 0) { isProcessing = false; return; }
+                
+                let i = 0;
+                function playNext() {
+                    if(i >= moves.length) {
+                        isProcessing = false;
+                        checkWin();
+                        return;
+                    }
+                    
+                    let targetIdx = moves[i]; // This is the index of the TILE to move into 0
+                    // Find where 0 is currently
+                    let zeroIdx = tiles.indexOf(0);
+                    
+                    // Highlight tile before moving
+                    let val = tiles[targetIdx];
+                    let el = document.getElementById(`tile-${val}`);
+                    if(el) el.classList.add('ai-move');
+
+                    setTimeout(() => {
+                        if(el) el.classList.remove('ai-move');
+                        // Swap logic
+                        [tiles[targetIdx], tiles[zeroIdx]] = [tiles[zeroIdx], tiles[targetIdx]];
+                        renderBoard();
+                        i++;
+                        setTimeout(playNext, 200);
+                    }, 100);
+                }
+                playNext();
+            });
+        }
+
+        function showGuide() {
+            Swal.fire({
+                title: 'MISSION BRIEF',
+                html: `
+                    <ul style="list-style: none; padding: 0; text-align: left;">
+                        <li style="margin-bottom: 10px;">► <strong>GOAL:</strong> Arrange the tiles in order 1-8.</li>
+                        <li style="margin-bottom: 10px;">► <strong>CONTROLS:</strong> Click a tile adjacent to the empty space to slide it.</li>
+                        <li style="margin-bottom: 10px;">► <strong>AI ASSIST:</strong> The AI uses A* Search with Manhattan Distance to find the fastest solution.</li>
+                    </ul>
+                `,
+                background: '#0a0a0a', color: '#4d4dff',
+                confirmButtonText: 'ACKNOWLEDGED',
+                confirmButtonColor: '#4d4dff',
+                customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title', content: 'swal-custom-content' }
+            });
+        }
+
+        renderBoard();
+    </script>
+</body>
+</html>

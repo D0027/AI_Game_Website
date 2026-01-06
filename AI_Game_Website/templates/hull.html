@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEURAL ARENA | Neon Hull</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        /* --- CORE STYLES --- */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: #020202; color: #fff; font-family: 'Rajdhani', sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+            min-height: 100vh; overflow-y: auto; padding-top: 20px; padding-bottom: 50px;
+            user-select: none;
+        }
+        #neural-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; background: radial-gradient(circle at center, #000d1a 0%, #000 100%); }
+        .scanlines { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2)); background-size: 100% 4px; pointer-events: none; z-index: -1; opacity: 0.3; }
+
+        .back-btn { position: absolute; top: 30px; left: 30px; text-decoration: none; color: #1e90ff; font-family: 'Orbitron'; font-size: 1rem; border: 1px solid #1e90ff; padding: 10px 20px; border-radius: 5px; transition: 0.3s; background: rgba(30, 144, 255, 0.1); }
+        .back-btn:hover { background-color: #1e90ff; color: #fff; box-shadow: 0 0 25px #1e90ff; }
+
+        h1 { font-family: 'Orbitron'; font-size: 3.5rem; text-shadow: 0 0 20px #1e90ff; color: #1e90ff; margin-bottom: 30px; margin-top: 40px; }
+
+        #hullCanvas {
+            background: rgba(0, 10, 20, 0.9);
+            border: 2px solid #1e90ff;
+            box-shadow: 0 0 40px rgba(30, 144, 255, 0.2);
+            border-radius: 5px;
+            cursor: crosshair;
+        }
+
+        .controls-area { margin-top: 30px; display: flex; gap: 20px; }
+        button {
+            padding: 10px 30px; font-family: 'Orbitron'; font-size: 1rem; color: #fff; background: #1e90ff;
+            border: none; cursor: pointer; border-radius: 5px; box-shadow: 0 0 20px #1e90ff; transition: 0.3s;
+        }
+        button:hover { transform: scale(1.1); box-shadow: 0 0 40px #1e90ff; }
+        
+        .btn-guide { background: transparent; border: 2px solid #1e90ff; color: #1e90ff; }
+        .btn-guide:hover { background: #1e90ff; color: #fff; }
+
+        .swal-custom-popup { background: #0a0a0a !important; border: 2px solid #1e90ff !important; }
+        .swal-custom-title { color: #1e90ff !important; font-family: 'Orbitron' !important; }
+        .swal-custom-content { color: #ccc !important; font-family: 'Rajdhani' !important; font-size: 1.1rem; text-align: left;}
+    </style>
+</head>
+<body>
+    <canvas id="neural-bg"></canvas>
+    <div class="scanlines"></div>
+
+    <a href="/" class="back-btn">← DASHBOARD</a>
+    <h1>NEON HULL</h1>
+
+    <canvas id="hullCanvas" width="800" height="500"></canvas>
+
+    <div class="controls-area">
+        <button class="btn-guide" onclick="showGuide()">MISSION BRIEF</button>
+        <button class="btn-guide" onclick="resetCanvas()">CLEAR SPACE</button>
+        <button onclick="scramblePoints()">SCRAMBLE</button>
+        <button onclick="runAI()">GENERATE SHIELD</button>
+    </div>
+
+    <script>
+        const bgCanvas = document.getElementById('neural-bg'); const bgCtx = bgCanvas.getContext('2d');
+        bgCanvas.width = window.innerWidth; bgCanvas.height = window.innerHeight;
+        let particles=[]; class Particle{constructor(){this.x=Math.random()*bgCanvas.width;this.y=Math.random()*bgCanvas.height;this.size=Math.random()*2;this.speedX=(Math.random()*1.0)-0.5;this.speedY=(Math.random()*1.0)-0.5;this.color='#1e90ff';}update(){this.x+=this.speedX;this.y+=this.speedY;if(this.x<0||this.x>bgCanvas.width)this.speedX*=-1;if(this.y<0||this.y>bgCanvas.height)this.speedY*=-1;}draw(){bgCtx.fillStyle=this.color;bgCtx.beginPath();bgCtx.arc(this.x,this.y,this.size,0,Math.PI*2);bgCtx.fill();}}
+        function initBg(){particles=[];for(let i=0;i<60;i++)particles.push(new Particle());}
+        function animateBg(){bgCtx.clearRect(0,0,bgCanvas.width,bgCanvas.height);for(let i=0;i<particles.length;i++){particles[i].update();particles[i].draw();connect(i);}requestAnimationFrame(animateBg);}
+        function connect(a){for(let b=a;b<particles.length;b++){let dist=((particles[a].x-particles[b].x)**2+(particles[a].y-particles[b].y)**2);if(dist<(bgCanvas.width/7)*(bgCanvas.height/7)){bgCtx.strokeStyle='rgba(30, 144, 255,'+(1-dist/25000)+')';bgCtx.lineWidth=1;bgCtx.beginPath();bgCtx.moveTo(particles[a].x,particles[a].y);bgCtx.lineTo(particles[b].x,particles[b].y);bgCtx.stroke();}}}
+        window.addEventListener('resize',()=>{bgCanvas.width=window.innerWidth;bgCanvas.height=window.innerHeight;initBg();});initBg(); animateBg();
+    </script>
+
+    <script>
+        const canvas = document.getElementById('hullCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        let points = [];
+        let hullPoints = [];
+        
+        // Dragging Logic
+        let isDragging = false;
+        let dragIndex = -1;
+
+        function resetCanvas() {
+            points = [];
+            hullPoints = [];
+            draw();
+        }
+
+        function scramblePoints() {
+            points = [];
+            hullPoints = [];
+            for(let i=0; i<20; i++) {
+                points.push({
+                    x: Math.random() * (canvas.width - 100) + 50,
+                    y: Math.random() * (canvas.height - 100) + 50
+                });
+            }
+            draw();
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw Hull Shape (Polygon)
+            if(hullPoints.length > 0) {
+                ctx.beginPath();
+                ctx.moveTo(hullPoints[0].x, hullPoints[0].y);
+                for(let i=1; i<hullPoints.length; i++) {
+                    ctx.lineTo(hullPoints[i].x, hullPoints[i].y);
+                }
+                ctx.closePath();
+                ctx.fillStyle = "rgba(30, 144, 255, 0.2)";
+                ctx.fill();
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = "#1e90ff";
+                ctx.shadowBlur = 20; ctx.shadowColor = "#1e90ff";
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+            }
+
+            // Draw Points
+            points.forEach((p, i) => {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 6, 0, Math.PI*2);
+                ctx.fillStyle = (i === dragIndex) ? "#fff" : "#1e90ff";
+                ctx.fill();
+                
+                // Highlight points on the hull
+                let isOnHull = hullPoints.some(hp => hp.x === p.x && hp.y === p.y);
+                if(isOnHull) {
+                    ctx.strokeStyle = "#fff";
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                }
+            });
+        }
+
+        // --- INTERACTIVITY ---
+        function getMousePos(e) {
+            const rect = canvas.getBoundingClientRect();
+            return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+        }
+
+        canvas.addEventListener('mousedown', (e) => {
+            const pos = getMousePos(e);
+            
+            // Check click on existing point
+            for(let i=0; i<points.length; i++) {
+                let dx = pos.x - points[i].x;
+                let dy = pos.y - points[i].y;
+                if(dx*dx + dy*dy < 100) { // Radius squared
+                    isDragging = true;
+                    dragIndex = i;
+                    draw();
+                    return;
+                }
+            }
+            
+            // Or add new point
+            points.push({x: pos.x, y: pos.y});
+            hullPoints = []; // Reset hull on change
+            draw();
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if(isDragging && dragIndex !== -1) {
+                const pos = getMousePos(e);
+                points[dragIndex].x = pos.x;
+                points[dragIndex].y = pos.y;
+                hullPoints = []; // Reset hull
+                draw();
+            }
+        });
+
+        window.addEventListener('mouseup', () => {
+            if(isDragging) {
+                isDragging = false;
+                dragIndex = -1;
+                draw();
+            }
+        });
+
+        function runAI() {
+            if(points.length < 3) {
+                Swal.fire({ title: 'DATA REQUIRED', text: 'Plot at least 3 points.', background: '#0a0a0a', color: '#1e90ff' });
+                return;
+            }
+
+            fetch('/solve_hull', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ points: points })
+            })
+            .then(res => res.json())
+            .then(data => {
+                hullPoints = data.hull;
+                draw();
+                // Visual Flash
+                canvas.style.boxShadow = "0 0 60px #1e90ff";
+                setTimeout(() => canvas.style.boxShadow = "0 0 40px rgba(30, 144, 255, 0.2)", 500);
+            });
+        }
+
+        function showGuide() {
+            Swal.fire({
+                title: 'MISSION BRIEF',
+                html: `
+                    <ul style="list-style: none; padding: 0; text-align: left;">
+                        <li style="margin-bottom: 10px;">► <strong>GOAL:</strong> Find the smallest polygon that encloses all data points.</li>
+                        <li style="margin-bottom: 10px;">► <strong>CONTROLS:</strong> Click to add points. Drag existing points to move them.</li>
+                        <li style="margin-bottom: 10px;">► <strong>AI ASSIST:</strong> Uses the <strong>Monotone Chain Algorithm</strong> to compute the Convex Hull efficiently.</li>
+                    </ul>
+                `,
+                background: '#0a0a0a', color: '#1e90ff',
+                confirmButtonText: 'ACKNOWLEDGED',
+                confirmButtonColor: '#1e90ff',
+                customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title', content: 'swal-custom-content' }
+            });
+        }
+
+        scramblePoints();
+    </script>
+</body>
+</html>

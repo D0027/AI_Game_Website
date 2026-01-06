@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEURAL ARENA | Neon Sudoku</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        /* --- CORE STYLES --- */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: #020202; color: #fff; font-family: 'Rajdhani', sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+            min-height: 100vh; overflow-y: auto; padding-top: 20px; padding-bottom: 50px;
+            user-select: none;
+        }
+        #neural-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; background: radial-gradient(circle at center, #000a1a 0%, #000 100%); }
+        .scanlines { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2)); background-size: 100% 4px; pointer-events: none; z-index: -1; opacity: 0.3; }
+
+        .back-btn { position: absolute; top: 30px; left: 30px; text-decoration: none; color: #0f52ba; font-family: 'Orbitron'; font-size: 1rem; border: 1px solid #0f52ba; padding: 10px 20px; border-radius: 5px; transition: 0.3s; background: rgba(15, 82, 186, 0.1); }
+        .back-btn:hover { background-color: #0f52ba; color: #fff; box-shadow: 0 0 25px #0f52ba; }
+
+        h1 { font-family: 'Orbitron'; font-size: 3.5rem; text-shadow: 0 0 20px #0f52ba; color: #0f52ba; margin-bottom: 10px; margin-top: 40px; }
+        
+        #sudoku-grid {
+            display: grid;
+            grid-template-columns: repeat(9, 50px);
+            grid-template-rows: repeat(9, 50px);
+            gap: 2px;
+            border: 3px solid #0f52ba;
+            padding: 5px;
+            background: #111;
+            box-shadow: 0 0 30px rgba(15, 82, 186, 0.3);
+        }
+
+        .cell {
+            width: 50px; height: 50px;
+            background: #0a0a0a;
+            color: #fff;
+            border: 1px solid #333;
+            font-family: 'Orbitron'; font-size: 1.5rem;
+            text-align: center; line-height: 50px;
+            outline: none; transition: 0.2s;
+        }
+        .cell:focus { background: #0f52ba; color: #fff; }
+        
+        /* 3x3 Borders */
+        .cell:nth-child(3n) { border-right: 2px solid #0f52ba; }
+        .cell:nth-child(9n) { border-right: 1px solid #333; } /* Reset end of row */
+        .row-sep { border-bottom: 2px solid #0f52ba !important; }
+
+        .fixed { color: #888; pointer-events: none; background: #050505; }
+        .solved-anim { animation: glow 0.5s ease-in-out alternate infinite; color: #00ffff; }
+
+        @keyframes glow { from { text-shadow: 0 0 5px #00ffff; } to { text-shadow: 0 0 20px #00ffff; } }
+
+        .controls-area { margin-top: 30px; display: flex; gap: 20px; }
+        button {
+            padding: 10px 30px; font-family: 'Orbitron'; font-size: 1rem; color: #fff; background: #0f52ba;
+            border: none; cursor: pointer; border-radius: 5px; box-shadow: 0 0 20px #0f52ba; transition: 0.3s;
+        }
+        button:hover { transform: scale(1.1); box-shadow: 0 0 40px #0f52ba; }
+        
+        .btn-guide { background: transparent; border: 2px solid #0f52ba; color: #0f52ba; }
+        .btn-guide:hover { background: #0f52ba; color: #fff; }
+
+        .swal-custom-popup { background: #0a0a0a !important; border: 2px solid #0f52ba !important; }
+        .swal-custom-title { color: #0f52ba !important; font-family: 'Orbitron' !important; }
+        .swal-custom-content { color: #ccc !important; font-family: 'Rajdhani' !important; font-size: 1.1rem; text-align: left;}
+    </style>
+</head>
+<body>
+    <canvas id="neural-bg"></canvas>
+    <div class="scanlines"></div>
+
+    <a href="/" class="back-btn">← DASHBOARD</a>
+    <h1>NEON SUDOKU</h1>
+
+    <div id="sudoku-grid"></div>
+
+    <div class="controls-area">
+        <button class="btn-guide" onclick="showGuide()">MISSION BRIEF</button>
+        <button onclick="newGame()">NEW DATASET</button>
+        <button onclick="runAI()">AI SOLVE</button>
+    </div>
+
+    <script>
+        const bgCanvas = document.getElementById('neural-bg'); const bgCtx = bgCanvas.getContext('2d');
+        bgCanvas.width = window.innerWidth; bgCanvas.height = window.innerHeight;
+        let particles=[]; class Particle{constructor(){this.x=Math.random()*bgCanvas.width;this.y=Math.random()*bgCanvas.height;this.size=Math.random()*2;this.speedX=(Math.random()*1.0)-0.5;this.speedY=(Math.random()*1.0)-0.5;this.color='#0f52ba';}update(){this.x+=this.speedX;this.y+=this.speedY;if(this.x<0||this.x>bgCanvas.width)this.speedX*=-1;if(this.y<0||this.y>bgCanvas.height)this.speedY*=-1;}draw(){bgCtx.fillStyle=this.color;bgCtx.beginPath();bgCtx.arc(this.x,this.y,this.size,0,Math.PI*2);bgCtx.fill();}}
+        function init(){particles=[];for(let i=0;i<60;i++)particles.push(new Particle());}
+        function animate(){bgCtx.clearRect(0,0,bgCanvas.width,bgCanvas.height);for(let i=0;i<particles.length;i++){particles[i].update();particles[i].draw();connect(i);}requestAnimationFrame(animate);}
+        function connect(a){for(let b=a;b<particles.length;b++){let dist=((particles[a].x-particles[b].x)**2+(particles[a].y-particles[b].y)**2);if(dist<(bgCanvas.width/7)*(bgCanvas.height/7)){bgCtx.strokeStyle='rgba(15, 82, 186,'+(1-dist/25000)+')';bgCtx.lineWidth=1;bgCtx.beginPath();bgCtx.moveTo(particles[a].x,particles[a].y);bgCtx.lineTo(particles[b].x,particles[b].y);bgCtx.stroke();}}}
+        window.addEventListener('resize',()=>{bgCanvas.width=window.innerWidth;bgCanvas.height=window.innerHeight;init();});init();animate();
+    </script>
+
+    <script>
+        // Simple base grid to generate from (Permutation base)
+        const BASE = [
+            [1,2,3,4,5,6,7,8,9],
+            [4,5,6,7,8,9,1,2,3],
+            [7,8,9,1,2,3,4,5,6],
+            [2,3,4,5,6,7,8,9,1],
+            [5,6,7,8,9,1,2,3,4],
+            [8,9,1,2,3,4,5,6,7],
+            [3,4,5,6,7,8,9,1,2],
+            [6,7,8,9,1,2,3,4,5],
+            [9,1,2,3,4,5,6,7,8]
+        ];
+
+        let currentBoard = [];
+
+        function createGridUI() {
+            const grid = document.getElementById('sudoku-grid');
+            grid.innerHTML = '';
+            for(let r=0; r<9; r++) {
+                for(let c=0; c<9; c++) {
+                    let input = document.createElement('input');
+                    input.type = 'text';
+                    input.maxLength = 1;
+                    input.className = 'cell';
+                    input.id = `cell-${r}-${c}`;
+                    
+                    // Add 3x3 border styling logic
+                    if((r+1) % 3 === 0 && r < 8) input.classList.add('row-sep');
+                    
+                    input.oninput = (e) => {
+                        e.target.value = e.target.value.replace(/[^1-9]/g, '');
+                    };
+                    grid.appendChild(input);
+                }
+            }
+        }
+
+        function shuffle(array) { return array.sort(() => Math.random() - 0.5); }
+
+        function generateBoard() {
+            // Clone Base
+            let board = JSON.parse(JSON.stringify(BASE));
+            
+            // Shuffle Rows within bands
+            for(let i=0; i<9; i+=3) {
+                let rows = [board[i], board[i+1], board[i+2]];
+                shuffle(rows);
+                board[i] = rows[0]; board[i+1] = rows[1]; board[i+2] = rows[2];
+            }
+            
+            // Transpose (swap rows/cols) to shuffle cols
+            if(Math.random() > 0.5) {
+                board = board[0].map((_, c) => board.map(row => row[c]));
+            }
+
+            // Remove numbers
+            let attempts = 40; 
+            while(attempts > 0) {
+                let r = Math.floor(Math.random()*9);
+                let c = Math.floor(Math.random()*9);
+                if(board[r][c] !== 0) {
+                    board[r][c] = 0;
+                    attempts--;
+                }
+            }
+            return board;
+        }
+
+        function newGame() {
+            createGridUI();
+            currentBoard = generateBoard();
+            
+            for(let r=0; r<9; r++) {
+                for(let c=0; c<9; c++) {
+                    let val = currentBoard[r][c];
+                    let el = document.getElementById(`cell-${r}-${c}`);
+                    if(val !== 0) {
+                        el.value = val;
+                        el.classList.add('fixed');
+                    } else {
+                        el.value = '';
+                        el.classList.remove('fixed', 'solved-anim');
+                    }
+                }
+            }
+        }
+
+        function runAI() {
+            // Read current state from DOM in case user typed
+            let gridData = [];
+            for(let r=0; r<9; r++) {
+                let row = [];
+                for(let c=0; c<9; c++) {
+                    let val = document.getElementById(`cell-${r}-${c}`).value;
+                    row.push(val === '' ? 0 : parseInt(val));
+                }
+                gridData.push(row);
+            }
+
+            fetch('/solve_sudoku', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ grid: gridData })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.solved) {
+                    // Animate filling
+                    for(let r=0; r<9; r++) {
+                        for(let c=0; c<9; c++) {
+                            let el = document.getElementById(`cell-${r}-${c}`);
+                            if(!el.classList.contains('fixed')) {
+                                // Stagger animation
+                                setTimeout(() => {
+                                    el.value = data.board[r][c];
+                                    el.classList.add('solved-anim');
+                                }, (r*9 + c) * 15);
+                            }
+                        }
+                    }
+                } else {
+                    Swal.fire({
+                        title: "UNSOLVABLE",
+                        text: "Data contradiction detected.",
+                        background: '#0a0a0a', color: '#ff0055', icon: 'error',
+                        customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title' }
+                    });
+                }
+            });
+        }
+
+        function showGuide() {
+            Swal.fire({
+                title: 'MISSION BRIEF',
+                html: `
+                    <ul style="list-style: none; padding: 0; text-align: left;">
+                        <li style="margin-bottom: 10px;">► <strong>GOAL:</strong> Fill the 9x9 grid with digits so that each column, each row, and each of the nine 3x3 subgrids contain all of the digits from 1 to 9.</li>
+                        <li style="margin-bottom: 10px;">► <strong>AI ASSIST:</strong> The AI uses a Recursive Backtracking algorithm to explore millions of possibilities and find the exact solution instantly.</li>
+                    </ul>
+                `,
+                background: '#0a0a0a', color: '#0f52ba',
+                confirmButtonText: 'ACKNOWLEDGED',
+                confirmButtonColor: '#0f52ba',
+                customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title', content: 'swal-custom-content' }
+            });
+        }
+
+        newGame();
+    </script>
+</body>
+</html>

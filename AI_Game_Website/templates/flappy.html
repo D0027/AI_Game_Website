@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEURAL ARENA | Neon Flappy</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        /* --- CORE STYLES --- */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: #020202; color: #fff; font-family: 'Rajdhani', sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+            min-height: 100vh; overflow-y: auto; padding-top: 20px; padding-bottom: 50px;
+            user-select: none;
+        }
+        #neural-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; background: radial-gradient(circle at center, #0a1a0a 0%, #000 100%); }
+        .scanlines { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2)); background-size: 100% 4px; pointer-events: none; z-index: -1; opacity: 0.3; }
+
+        .back-btn { position: absolute; top: 30px; left: 30px; text-decoration: none; color: #32cd32; font-family: 'Orbitron'; font-size: 1rem; border: 1px solid #32cd32; padding: 10px 20px; border-radius: 5px; transition: 0.3s; background: rgba(50, 205, 50, 0.1); }
+        .back-btn:hover { background-color: #32cd32; color: #000; box-shadow: 0 0 25px #32cd32; }
+
+        h1 { font-family: 'Orbitron'; font-size: 3.5rem; text-shadow: 0 0 20px #32cd32; color: #32cd32; margin-bottom: 10px; margin-top: 40px; }
+        .score-board { font-family: 'Orbitron'; font-size: 2rem; margin-bottom: 15px; color: #fff; }
+
+        #gameCanvas {
+            background: rgba(0, 20, 0, 0.8);
+            border: 2px solid #32cd32;
+            box-shadow: 0 0 40px rgba(50, 205, 50, 0.2);
+            border-radius: 5px;
+        }
+
+        .controls-area { margin-top: 20px; display: flex; gap: 20px; }
+        
+        button {
+            padding: 10px 30px; font-family: 'Orbitron'; font-size: 1rem; color: #000; background: #32cd32;
+            border: none; cursor: pointer; border-radius: 5px; box-shadow: 0 0 20px #32cd32; transition: 0.3s;
+        }
+        button:hover { transform: scale(1.1); box-shadow: 0 0 40px #32cd32; }
+        
+        .btn-ai.active { background: #ff0055; color: #fff; box-shadow: 0 0 20px #ff0055; }
+        
+        .instructions { margin-top: 15px; color: #888; font-family: 'Orbitron'; letter-spacing: 1px; font-size: 0.9rem; }
+
+        .swal-custom-popup { background: #0a0a0a !important; border: 2px solid #32cd32 !important; }
+        .swal-custom-title { color: #32cd32 !important; font-family: 'Orbitron' !important; }
+    </style>
+</head>
+<body>
+    <canvas id="neural-bg"></canvas>
+    <div class="scanlines"></div>
+
+    <a href="/" class="back-btn">← DASHBOARD</a>
+    <h1>NEON FLAPPY</h1>
+    <div class="score-board">SCORE: <span id="score">0</span></div>
+
+    <canvas id="gameCanvas" width="400" height="600"></canvas>
+
+    <div class="controls-area">
+        <button onclick="resetGame()">RESTART SYSTEM</button>
+        <button id="aiBtn" class="btn-ai" onclick="toggleAI()">ACTIVATE AI</button>
+    </div>
+    
+    <div class="instructions">CONTROLS: SPACEBAR, UP ARROW, or CLICK to Jump</div>
+
+    <script>
+        const bgCanvas = document.getElementById('neural-bg'); const bgCtx = bgCanvas.getContext('2d');
+        bgCanvas.width = window.innerWidth; bgCanvas.height = window.innerHeight;
+        let bgParticles=[]; class Particle{constructor(){this.x=Math.random()*bgCanvas.width;this.y=Math.random()*bgCanvas.height;this.size=Math.random()*2;this.speedX=(Math.random()*1.5)-0.75;this.speedY=(Math.random()*1.5)-0.75;this.color='#32cd32';}update(){this.x+=this.speedX;this.y+=this.speedY;if(this.x<0||this.x>bgCanvas.width)this.speedX*=-1;if(this.y<0||this.y>bgCanvas.height)this.speedY*=-1;}draw(){bgCtx.fillStyle=this.color;bgCtx.beginPath();bgCtx.arc(this.x,this.y,this.size,0,Math.PI*2);bgCtx.fill();}}
+        function initBg(){bgParticles=[];for(let i=0;i<80;i++)bgParticles.push(new Particle());}
+        function animateBg(){bgCtx.clearRect(0,0,bgCanvas.width,bgCanvas.height);for(let i=0;i<bgParticles.length;i++){bgParticles[i].update();bgParticles[i].draw();connect(i);}requestAnimationFrame(animateBg);}
+        function connect(a){for(let b=a;b<bgParticles.length;b++){let dist=((bgParticles[a].x-bgParticles[b].x)**2+(bgParticles[a].y-bgParticles[b].y)**2);if(dist<(bgCanvas.width/7)*(bgCanvas.height/7)){bgCtx.strokeStyle='rgba(50, 205, 50,'+(1-dist/20000)+')';bgCtx.lineWidth=1;bgCtx.beginPath();bgCtx.moveTo(bgParticles[a].x,bgParticles[a].y);bgCtx.lineTo(bgParticles[b].x,bgParticles[b].y);bgCtx.stroke();}}}
+        window.addEventListener('resize',()=>{bgCanvas.width=window.innerWidth;bgCanvas.height=window.innerHeight;initBg();});initBg();animateBg();
+    </script>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Physics Constants (Tweaked for better handling)
+        const GRAVITY = 0.23; // Reduced from 0.25 for floatier feel
+        const FLAP_STRENGTH = -5.5; 
+        const SPAWN_RATE = 90; 
+        const PIPE_SPEED = 2;
+        const GAP_HEIGHT = 160; // Slightly larger gap
+
+        // Game State
+        let bird = { x: 50, y: 300, velocity: 0, radius: 10 };
+        let pipes = [];
+        let frameCount = 0;
+        let score = 0;
+        let gameRunning = true;
+        let isAI = false;
+        let particles = [];
+
+        function resetGame() {
+            bird = { x: 50, y: 300, velocity: 0, radius: 10 };
+            pipes = [];
+            score = 0;
+            frameCount = 0;
+            gameRunning = true;
+            document.getElementById('score').innerText = 0;
+            particles = [];
+            loop();
+        }
+
+        function jump() {
+            if(!gameRunning) return;
+            bird.velocity = FLAP_STRENGTH;
+        }
+
+        // --- AI LOGIC ---
+        function runAI() {
+            if(!gameRunning || !isAI) return;
+
+            let nextPipe = pipes.find(p => p.x + p.width > bird.x);
+            if(nextPipe) {
+                let gapY = nextPipe.topHeight;
+                
+                fetch('/move_flappy', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ 
+                        birdY: bird.y, 
+                        velocity: bird.velocity,
+                        gapY: gapY,
+                        gapHeight: GAP_HEIGHT
+                    })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if(data.jump) jump();
+                })
+                .catch(e => console.log(e)); 
+            } else {
+                // Improved hovering logic
+                if(bird.y > canvas.height/2 + 20) jump();
+            }
+        }
+
+        function toggleAI() {
+            isAI = !isAI;
+            const btn = document.getElementById('aiBtn');
+            if(isAI) {
+                btn.innerText = "DEACTIVATE AI";
+                btn.classList.add('active');
+            } else {
+                btn.innerText = "ACTIVATE AI";
+                btn.classList.remove('active');
+            }
+        }
+
+        // --- UPDATE LOOP ---
+        function update() {
+            // Bird Physics
+            bird.velocity += GRAVITY;
+            bird.y += bird.velocity;
+
+            // Pipe Management
+            if (frameCount % SPAWN_RATE === 0) {
+                let topHeight = Math.random() * (canvas.height - GAP_HEIGHT - 100) + 50;
+                pipes.push({
+                    x: canvas.width,
+                    y: 0,
+                    width: 50,
+                    topHeight: topHeight,
+                    passed: false
+                });
+            }
+
+            for (let i = 0; i < pipes.length; i++) {
+                let p = pipes[i];
+                p.x -= PIPE_SPEED;
+
+                // Collision Detection
+                if (bird.x + bird.radius > p.x && bird.x - bird.radius < p.x + p.width &&
+                    bird.y - bird.radius < p.topHeight) {
+                    gameOver();
+                }
+                if (bird.x + bird.radius > p.x && bird.x - bird.radius < p.x + p.width &&
+                    bird.y + bird.radius > p.topHeight + GAP_HEIGHT) {
+                    gameOver();
+                }
+                // Score
+                if (p.x + p.width < bird.x && !p.passed) {
+                    score++;
+                    p.passed = true;
+                    document.getElementById('score').innerText = score;
+                }
+            }
+
+            pipes = pipes.filter(p => p.x + p.width > 0);
+
+            if (bird.y + bird.radius >= canvas.height || bird.y - bird.radius <= 0) {
+                gameOver();
+            }
+
+            // Particles
+            for(let i=0; i<particles.length; i++){
+                particles[i].x += particles[i].vx;
+                particles[i].y += particles[i].vy;
+                particles[i].life -= 0.05;
+            }
+            particles = particles.filter(p => p.life > 0);
+
+            frameCount++;
+            if(isAI && frameCount % 3 === 0) runAI(); 
+        }
+
+        // --- DRAW LOOP ---
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Pipes
+            ctx.fillStyle = "#32cd32";
+            ctx.shadowBlur = 10; ctx.shadowColor = "#32cd32";
+            for (let p of pipes) {
+                ctx.fillRect(p.x, 0, p.width, p.topHeight);
+                ctx.fillRect(p.x, p.topHeight + GAP_HEIGHT, p.width, canvas.height - (p.topHeight + GAP_HEIGHT));
+            }
+            ctx.shadowBlur = 0;
+
+            // Draw Bird
+            ctx.beginPath();
+            ctx.arc(bird.x, bird.y, bird.radius, 0, Math.PI * 2);
+            ctx.fillStyle = "#fff";
+            ctx.fill();
+            ctx.closePath();
+            
+            ctx.beginPath();
+            ctx.arc(bird.x, bird.y, bird.radius + 2, 0, Math.PI * 2);
+            ctx.strokeStyle = "#32cd32";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.closePath();
+
+            // Particles
+            for(let p of particles){
+                ctx.fillStyle = `rgba(50, 205, 50, ${p.life})`;
+                ctx.fillRect(p.x, p.y, 3, 3);
+            }
+        }
+
+        function createExplosion() {
+            for(let i=0; i<20; i++){
+                particles.push({
+                    x: bird.x, y: bird.y,
+                    vx: (Math.random()-0.5)*10,
+                    vy: (Math.random()-0.5)*10,
+                    life: 1
+                });
+            }
+        }
+
+        function gameOver() {
+            gameRunning = false;
+            createExplosion();
+            draw();
+            
+            Swal.fire({
+                title: "SYSTEM FAILURE",
+                text: "Neural Link Severed.",
+                background: '#0a0a0a', color: '#32cd32', icon: 'error',
+                confirmButtonText: 'REBOOT',
+                customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title' }
+            }).then(() => resetGame());
+        }
+
+        function loop() {
+            if (gameRunning) {
+                update();
+                draw();
+                requestAnimationFrame(loop);
+            }
+        }
+
+        // IMPROVED INPUTS (Up Arrow, W, Space, Click)
+        document.addEventListener('keydown', (e) => {
+            if (!isAI && (e.code === "Space" || e.code === "ArrowUp" || e.code === "KeyW")) {
+                jump();
+            }
+        });
+        canvas.addEventListener('mousedown', () => {
+            if (!isAI) jump();
+        });
+
+        resetGame();
+    </script>
+</body>
+</html>

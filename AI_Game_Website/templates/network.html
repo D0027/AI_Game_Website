@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEURAL ARENA | Neon Network</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        /* --- CORE STYLES --- */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: #020202; color: #fff; font-family: 'Rajdhani', sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+            min-height: 100vh; overflow-y: auto; padding-top: 20px; padding-bottom: 50px;
+            user-select: none;
+        }
+        #neural-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; background: radial-gradient(circle at center, #1a0000 0%, #000 100%); }
+        .scanlines { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2)); background-size: 100% 4px; pointer-events: none; z-index: -1; opacity: 0.3; }
+
+        .back-btn { position: absolute; top: 30px; left: 30px; text-decoration: none; color: #dc143c; font-family: 'Orbitron'; font-size: 1rem; border: 1px solid #dc143c; padding: 10px 20px; border-radius: 5px; transition: 0.3s; background: rgba(220, 20, 60, 0.1); }
+        .back-btn:hover { background-color: #dc143c; color: #fff; box-shadow: 0 0 25px #dc143c; }
+
+        h1 { font-family: 'Orbitron'; font-size: 3.5rem; text-shadow: 0 0 20px #dc143c; color: #dc143c; margin-bottom: 10px; margin-top: 40px; }
+        .status-bar { font-family: 'Orbitron'; font-size: 1.5rem; margin-bottom: 15px; color: #fff; }
+
+        #gameCanvas {
+            background: rgba(20, 0, 0, 0.8);
+            border: 2px solid #dc143c;
+            box-shadow: 0 0 40px rgba(220, 20, 60, 0.2);
+            border-radius: 5px;
+            cursor: grab;
+        }
+        #gameCanvas:active { cursor: grabbing; }
+
+        .controls-area { margin-top: 20px; display: flex; gap: 20px; }
+        button {
+            padding: 10px 30px; font-family: 'Orbitron'; font-size: 1rem; color: #fff; background: #dc143c;
+            border: none; cursor: pointer; border-radius: 5px; box-shadow: 0 0 20px #dc143c; transition: 0.3s;
+        }
+        button:hover { transform: scale(1.1); box-shadow: 0 0 40px #dc143c; }
+        
+        .btn-guide { background: transparent; border: 2px solid #dc143c; color: #dc143c; }
+        .btn-guide:hover { background: #dc143c; color: #fff; }
+
+        .swal-custom-popup { background: #0a0a0a !important; border: 2px solid #dc143c !important; }
+        .swal-custom-title { color: #dc143c !important; font-family: 'Orbitron' !important; }
+        .swal-custom-content { color: #ccc !important; font-family: 'Rajdhani' !important; font-size: 1.1rem; text-align: left;}
+    </style>
+</head>
+<body>
+    <canvas id="neural-bg"></canvas>
+    <div class="scanlines"></div>
+
+    <a href="/" class="back-btn">← DASHBOARD</a>
+    <h1>NEON NETWORK</h1>
+    <div class="status-bar">TOTAL DISTANCE: <span id="dist">0</span></div>
+
+    <canvas id="gameCanvas" width="800" height="500"></canvas>
+
+    <div class="controls-area">
+        <button class="btn-guide" onclick="showGuide()">MISSION BRIEF</button>
+        <button onclick="initGame()">SCRAMBLE NODES</button>
+        <button onclick="runAI()">OPTIMIZE ROUTE</button>
+    </div>
+
+    <script>
+        const bgCanvas = document.getElementById('neural-bg'); const bgCtx = bgCanvas.getContext('2d');
+        bgCanvas.width = window.innerWidth; bgCanvas.height = window.innerHeight;
+        let particles=[]; class Particle{constructor(){this.x=Math.random()*bgCanvas.width;this.y=Math.random()*bgCanvas.height;this.size=Math.random()*2;this.speedX=(Math.random()*1.0)-0.5;this.speedY=(Math.random()*1.0)-0.5;this.color='#dc143c';}update(){this.x+=this.speedX;this.y+=this.speedY;if(this.x<0||this.x>bgCanvas.width)this.speedX*=-1;if(this.y<0||this.y>bgCanvas.height)this.speedY*=-1;}draw(){bgCtx.fillStyle=this.color;bgCtx.beginPath();bgCtx.arc(this.x,this.y,this.size,0,Math.PI*2);bgCtx.fill();}}
+        function init(){particles=[];for(let i=0;i<60;i++)particles.push(new Particle());}
+        function animate(){bgCtx.clearRect(0,0,bgCanvas.width,bgCanvas.height);for(let i=0;i<particles.length;i++){particles[i].update();particles[i].draw();connect(i);}requestAnimationFrame(animate);}
+        function connect(a){for(let b=a;b<particles.length;b++){let dist=((particles[a].x-particles[b].x)**2+(particles[a].y-particles[b].y)**2);if(dist<(bgCanvas.width/7)*(bgCanvas.height/7)){bgCtx.strokeStyle='rgba(220, 20, 60,'+(1-dist/25000)+')';bgCtx.lineWidth=1;bgCtx.beginPath();bgCtx.moveTo(particles[a].x,particles[a].y);bgCtx.lineTo(particles[b].x,particles[b].y);bgCtx.stroke();}}}
+        window.addEventListener('resize',()=>{bgCanvas.width=window.innerWidth;bgCanvas.height=window.innerHeight;init();});init();animate();
+    </script>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const NODE_COUNT = 20;
+        const NODE_RADIUS = 8;
+        
+        let nodes = [];
+        let order = []; 
+        let isDragging = false;
+        let dragIndex = -1;
+
+        // --- INITIALIZATION ---
+        function initGame() {
+            nodes = [];
+            order = [];
+            for(let i=0; i<NODE_COUNT; i++) {
+                nodes.push({
+                    x: Math.random() * (canvas.width - 60) + 30,
+                    y: Math.random() * (canvas.height - 60) + 30
+                });
+                order.push(i);
+            }
+            // Scramble initial order
+            order.sort(() => Math.random() - 0.5);
+            draw();
+            calcDistance();
+        }
+
+        // --- RENDERING ---
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 1. Draw Connections
+            ctx.beginPath();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.5)"; // Chaos is dim white
+            
+            if(order.length > 0) {
+                let start = nodes[order[0]];
+                ctx.moveTo(start.x, start.y);
+                
+                for(let i=1; i<order.length; i++) {
+                    let p = nodes[order[i]];
+                    ctx.lineTo(p.x, p.y);
+                }
+                ctx.lineTo(start.x, start.y); // Close loop
+            }
+            ctx.stroke();
+
+            // 2. Draw Nodes
+            nodes.forEach((p, i) => {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, NODE_RADIUS, 0, Math.PI*2);
+                
+                // Highlight grabbed node
+                if(i === dragIndex) {
+                    ctx.fillStyle = "#fff";
+                    ctx.shadowBlur = 20; ctx.shadowColor = "#fff";
+                } else {
+                    ctx.fillStyle = "#dc143c";
+                    ctx.shadowBlur = 10; ctx.shadowColor = "#dc143c";
+                }
+                
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            });
+        }
+
+        function calcDistance() {
+            let d = 0;
+            for(let i=0; i<order.length; i++) {
+                let p1 = nodes[order[i]];
+                let p2 = nodes[order[(i+1)%order.length]];
+                d += Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
+            }
+            document.getElementById('dist').innerText = Math.floor(d);
+        }
+
+        // --- INTERACTIVITY (MOUSE & TOUCH) ---
+        function getMousePos(e) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.clientX || e.touches[0].clientX;
+            const clientY = e.clientY || e.touches[0].clientY;
+            return {
+                x: clientX - rect.left,
+                y: clientY - rect.top
+            };
+        }
+
+        // Mouse Down
+        canvas.addEventListener('mousedown', startDrag);
+        canvas.addEventListener('touchstart', startDrag, {passive: false});
+
+        function startDrag(e) {
+            e.preventDefault(); // Prevent scrolling on touch
+            const pos = getMousePos(e);
+            
+            // Check if clicked on a node
+            for(let i=0; i<nodes.length; i++) {
+                let dx = pos.x - nodes[i].x;
+                let dy = pos.y - nodes[i].y;
+                if(dx*dx + dy*dy < (NODE_RADIUS + 5)**2) { // Hitbox slightly larger
+                    isDragging = true;
+                    dragIndex = i;
+                    draw(); // Highlight selected
+                    return;
+                }
+            }
+        }
+
+        // Mouse Move
+        canvas.addEventListener('mousemove', drag);
+        canvas.addEventListener('touchmove', drag, {passive: false});
+
+        function drag(e) {
+            if(isDragging && dragIndex !== -1) {
+                e.preventDefault();
+                const pos = getMousePos(e);
+                
+                // Update position
+                nodes[dragIndex].x = pos.x;
+                nodes[dragIndex].y = pos.y;
+                
+                // Boundary checks
+                if(nodes[dragIndex].x < 10) nodes[dragIndex].x = 10;
+                if(nodes[dragIndex].x > canvas.width - 10) nodes[dragIndex].x = canvas.width - 10;
+                if(nodes[dragIndex].y < 10) nodes[dragIndex].y = 10;
+                if(nodes[dragIndex].y > canvas.height - 10) nodes[dragIndex].y = canvas.height - 10;
+
+                draw();
+                calcDistance();
+            }
+        }
+
+        // Mouse Up
+        window.addEventListener('mouseup', endDrag);
+        window.addEventListener('touchend', endDrag);
+
+        function endDrag() {
+            if(isDragging) {
+                isDragging = false;
+                dragIndex = -1;
+                draw();
+            }
+        }
+
+        // --- AI LOGIC ---
+        function runAI() {
+            if(nodes.length === 0) return;
+
+            fetch('/solve_tsp', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ points: nodes })
+            })
+            .then(res => res.json())
+            .then(data => {
+                order = data.path;
+                animateSolution();
+            });
+        }
+
+        function animateSolution() {
+            // Flash effect for solution
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.beginPath();
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = "#dc143c"; // Optimized Color
+            ctx.shadowBlur = 15; ctx.shadowColor = "#dc143c";
+            
+            let start = nodes[order[0]];
+            ctx.moveTo(start.x, start.y);
+            
+            for(let i=1; i<order.length; i++) {
+                let p = nodes[order[i]];
+                ctx.lineTo(p.x, p.y);
+            }
+            ctx.lineTo(start.x, start.y); 
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+
+            nodes.forEach(p => {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, NODE_RADIUS, 0, Math.PI*2);
+                ctx.fillStyle = "#fff";
+                ctx.fill();
+            });
+            
+            calcDistance();
+            
+            Swal.fire({
+                title: "NETWORK OPTIMIZED",
+                text: `Efficiency Max. Total Distance: ${document.getElementById('dist').innerText}`,
+                background: '#0a0a0a', color: '#dc143c', icon: 'success',
+                timer: 1500, showConfirmButton: false,
+                customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title' }
+            });
+        }
+
+        function showGuide() {
+            Swal.fire({
+                title: 'MISSION BRIEF',
+                html: `
+                    <ul style="list-style: none; padding: 0; text-align: left;">
+                        <li style="margin-bottom: 10px;">► <strong>INTERACTIVE MODE:</strong> Click and Drag any node to untangle the web manually.</li>
+                        <li style="margin-bottom: 10px;">► <strong>GOAL:</strong> Find the shortest loop connecting all servers.</li>
+                        <li style="margin-bottom: 10px;">► <strong>AI ASSIST:</strong> Click "OPTIMIZE" to run a 2-Opt Algorithm that instantly finds the most efficient path.</li>
+                    </ul>
+                `,
+                background: '#0a0a0a', color: '#dc143c',
+                confirmButtonText: 'ACKNOWLEDGED',
+                confirmButtonColor: '#dc143c',
+                customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title', content: 'swal-custom-content' }
+            });
+        }
+
+        initGame();
+    </script>
+</body>
+</html>

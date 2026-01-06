@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEURAL ARENA | Neon Pac-Man</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        /* --- ADVANCED UI STYLES --- */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: #020202; color: #fff; font-family: 'Rajdhani', sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            min-height: 100vh; 
+            /* FIX: Changed hidden to auto so you can scroll if the screen is small */
+            overflow-y: auto; 
+            padding-bottom: 50px; /* Adds space at the bottom */
+        }
+
+        /* --- BACKGROUND EFFECTS --- */
+        #neural-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; background: radial-gradient(circle at center, #0a0a0a 0%, #000 100%); }
+        .scanlines { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2)); background-size: 100% 4px; pointer-events: none; z-index: -1; opacity: 0.3; }
+
+        /* --- UI ELEMENTS --- */
+        .back-btn { 
+            position: absolute; top: 30px; left: 30px; text-decoration: none; 
+            color: #ff0055; font-family: 'Orbitron', sans-serif; font-size: 1rem; 
+            border: 1px solid #ff0055; padding: 10px 20px; border-radius: 5px; 
+            transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 2px; 
+            backdrop-filter: blur(5px); background: rgba(255, 0, 85, 0.1); 
+        }
+        .back-btn:hover { background-color: #ff0055; color: #050505; box-shadow: 0 0 25px #ff0055; }
+
+        h1 { 
+            font-family: 'Orbitron', sans-serif; font-size: 3.5rem; font-weight: 900; 
+            text-shadow: 0 0 20px #ff0055, 0 0 40px #ff0055; letter-spacing: 5px; 
+            margin-bottom: 10px; text-transform: uppercase; color: #fff; margin-top: 60px;
+        }
+
+        /* --- GLASS GAME CONTAINER --- */
+        #game-container { 
+            position: relative; margin-top: 20px; padding: 10px; 
+            background: rgba(255, 0, 85, 0.05); border-radius: 15px; 
+            backdrop-filter: blur(5px); border: 1px solid rgba(255, 0, 85, 0.2); 
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        }
+
+        /* --- GLOWING GRID --- */
+        #grid { 
+            display: grid; grid-template-columns: repeat(20, 25px); grid-template-rows: repeat(20, 25px); 
+            gap: 1px; background-color: rgba(0,0,0,0.8); 
+            border: 3px solid #ff0055; box-shadow: 0 0 30px rgba(255, 0, 85, 0.5), inset 0 0 30px rgba(255, 0, 85, 0.2); 
+        }
+
+        .cell { width: 25px; height: 25px; background-color: rgba(0,0,0,0.5); }
+        .wall { background-color: #1a0505; border: 1px solid #330011; box-shadow: inset 0 0 10px #000; }
+
+        /* --- ENTITIES WITH PULSE --- */
+        .player { 
+            background-color: #ffff00; border-radius: 50%; 
+            box-shadow: 0 0 20px #ffff00, 0 0 10px #ffff00 inset; z-index: 100; 
+            animation: pulseYellow 1s infinite alternate; 
+        }
+        @keyframes pulseYellow { 0% { box-shadow: 0 0 15px #ffff00; transform: scale(0.9); } 100% { box-shadow: 0 0 30px #ffff00; transform: scale(1.1); } }
+        
+        .ghost { 
+            background-color: #ff0000; border-radius: 50% 50% 0 0; 
+            box-shadow: 0 0 20px #ff0000; z-index: 90; animation: floatGhost 2s infinite ease-in-out; 
+        }
+        .ghost-2 { 
+            background-color: #00ccff; border-radius: 50% 50% 0 0; 
+            box-shadow: 0 0 20px #00ccff; z-index: 90; animation: floatGhost 2s infinite ease-in-out reverse; 
+        }
+        @keyframes floatGhost { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+
+        .goal { 
+            background-color: #00ff00; box-shadow: 0 0 25px #00ff00; 
+            animation: pulseGoal 0.8s infinite alternate; border-radius: 5px; 
+        }
+        @keyframes pulseGoal { 0% { transform: scale(0.8); box-shadow: 0 0 15px #00ff00; } 100% { transform: scale(1.2); box-shadow: 0 0 40px #00ff00; } }
+
+        .path-node { 
+            background-color: rgba(255, 0, 85, 0.4); transform: scale(0.2); 
+            border-radius: 50%; box-shadow: 0 0 10px rgba(255, 0, 85, 0.8); 
+        }
+
+        #controls { 
+            margin-top: 25px; color: #aaa; font-family: 'Orbitron'; letter-spacing: 1px; 
+            text-align: center; background: rgba(0,0,0,0.5); padding: 15px; 
+            border-radius: 10px; border: 1px solid #333; backdrop-filter: blur(5px); 
+        }
+        span.highlight { color: #00ff00; font-weight: bold; text-shadow: 0 0 10px #00ff00; }
+        
+        /* --- POPUP --- */
+        .swal-custom-popup { 
+            background: rgba(10, 10, 10, 0.95) !important; 
+            backdrop-filter: blur(10px) !important; 
+            border: 2px solid #ff0055 !important; 
+            box-shadow: 0 0 50px rgba(255, 0, 85, 0.3) !important; 
+        }
+        .swal-custom-title { 
+            color: #ff0055 !important; 
+            font-family: 'Orbitron', sans-serif !important; 
+            text-shadow: 0 0 15px #ff0055 !important; 
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="neural-bg"></canvas>
+    <div class="scanlines"></div>
+
+    <a href="/" class="back-btn">← DASHBOARD</a>
+    <h1>INTELLIGENT AI HUNTER</h1>
+    
+    <div id="game-container">
+        <div id="grid"></div>
+    </div>
+
+    <div id="controls">
+        <span style="color:#ff0000; text-shadow: 0 0 10px #ff0000;">RED AI</span> Hunts. <span style="color:#00ccff; text-shadow: 0 0 10px #00ccff;">BLUE AI</span> Guards. <br>
+        <span style="color:#ffff00; text-shadow: 0 0 10px #ffff00;">TIP:</span> You are slightly faster than them. Use it!
+    </div>
+
+    <script>
+        const canvas = document.getElementById('neural-bg'); const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+        let particlesArray; class Particle { constructor() { this.x = Math.random() * canvas.width; this.y = Math.random() * canvas.height; this.size = Math.random() * 2; this.speedX = (Math.random() * 1.5) - 0.75; this.speedY = (Math.random() * 1.5) - 0.75; this.color = '#ff0055'; } update() { this.x += this.speedX; this.y += this.speedY; if (this.x < 0 || this.x > canvas.width) this.speedX *= -1; if (this.y < 0 || this.y > canvas.height) this.speedY *= -1; } draw() { ctx.fillStyle = this.color; ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fill(); } }
+        function init() { particlesArray = []; let numberOfParticles = (canvas.height * canvas.width) / 15000; for (let i = 0; i < numberOfParticles; i++) { particlesArray.push(new Particle()); } }
+        function animate() { ctx.clearRect(0, 0, canvas.width, canvas.height); for (let i = 0; i < particlesArray.length; i++) { particlesArray[i].update(); particlesArray[i].draw(); connect(i); } requestAnimationFrame(animate); }
+        function connect(a) { for (let b = a; b < particlesArray.length; b++) { let distance = ((particlesArray[a].x - particlesArray[b].x) * (particlesArray[a].x - particlesArray[b].x)) + ((particlesArray[a].y - particlesArray[b].y) * (particlesArray[a].y - particlesArray[b].y)); if (distance < (canvas.width/9) * (canvas.height/9)) { let opacityValue = 0.8 - (distance / 20000); ctx.strokeStyle = 'rgba(255, 0, 85,' + opacityValue + ')'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(particlesArray[a].x, particlesArray[a].y); ctx.lineTo(particlesArray[b].x, particlesArray[b].y); ctx.stroke(); } } }
+        window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; init(); }); init(); animate();
+    </script>
+
+    <script>
+        const gridSize = 20;
+        let playerPos = [1, 1];
+        let ghosts = [[10, 10], [15, 15]]; 
+        let goalPos = [17, 18]; 
+        let gameActive = true;
+        let moveCounter = 0; 
+
+        const layout = [
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,1],
+            [1,0,1,1,0,1,0,1,1,1,1,1,0,1,0,1,1,1,0,1],
+            [1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1],
+            [1,0,1,0,1,1,1,1,1,0,1,1,1,1,1,0,1,1,0,1],
+            [1,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1], 
+            [1,1,1,0,1,0,1,1,0,0,0,1,1,0,1,0,1,1,1,1],
+            [1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,1],
+            [1,0,1,1,1,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1],
+            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1], 
+            [1,0,1,1,1,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1],
+            [1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,1],
+            [1,1,1,0,1,0,1,1,0,0,0,1,1,0,1,0,1,1,1,1],
+            [1,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1],
+            [1,0,1,0,1,1,1,1,1,0,1,1,1,1,1,0,1,1,0,1],
+            [1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1],
+            [1,0,1,1,0,1,0,1,1,1,1,1,0,1,0,1,1,1,0,1],
+            [1,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1] 
+        ];
+
+        function createGrid() {
+            const grid = document.getElementById('grid');
+            grid.innerHTML = '';
+            for(let r=0; r<gridSize; r++) {
+                for(let c=0; c<gridSize; c++) {
+                    const div = document.createElement('div');
+                    div.classList.add('cell');
+                    div.id = `cell-${r}-${c}`;
+                    if(layout[r][c] === 1) div.classList.add('wall');
+                    if(r === goalPos[0] && c === goalPos[1]) div.classList.add('goal');
+                    grid.appendChild(div);
+                }
+            }
+            drawEntities();
+        }
+
+        function drawEntities() {
+            document.querySelectorAll('.player, .ghost, .ghost-2, .path-node').forEach(el => el.classList.remove('player', 'ghost', 'ghost-2', 'path-node'));
+            document.getElementById(`cell-${playerPos[0]}-${playerPos[1]}`).classList.add('player');
+            if(ghosts[0]) document.getElementById(`cell-${ghosts[0][0]}-${ghosts[0][1]}`).classList.add('ghost');
+            if(ghosts[1]) document.getElementById(`cell-${ghosts[1][0]}-${ghosts[1][1]}`).classList.add('ghost-2');
+        }
+
+        function drawPaths(paths) {
+            paths.forEach(path => {
+                path.forEach(pos => {
+                    const el = document.getElementById(`cell-${pos[0]}-${pos[1]}`);
+                    if(el && !el.classList.contains('player') && !el.classList.contains('ghost') && !el.classList.contains('ghost-2')) {
+                        el.classList.add('path-node');
+                    }
+                });
+            });
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if(!gameActive) return;
+            let newRow = playerPos[0], newCol = playerPos[1];
+            if(e.key === 'ArrowUp') newRow--;
+            if(e.key === 'ArrowDown') newRow++;
+            if(e.key === 'ArrowLeft') newCol--;
+            if(e.key === 'ArrowRight') newCol++;
+
+            if(layout[newRow][newCol] !== 1) {
+                playerPos = [newRow, newCol];
+                drawEntities();
+                moveCounter++; 
+
+                if(playerPos[0] === goalPos[0] && playerPos[1] === goalPos[1]) { gameWin(); return; } 
+                if(ghosts.some(g => g[0] === playerPos[0] && g[1] === playerPos[1])) { gameLose(); return; }
+
+                if (moveCounter % 4 !== 0) {
+                    moveGhosts();
+                }
+            }
+        });
+
+        function gameWin() {
+            gameActive = false;
+            Swal.fire({
+                title: 'MISSION COMPLETE!',
+                text: 'You outsmarted the AI.',
+                icon: 'success',
+                background: '#050505',
+                color: '#00ff00',
+                confirmButtonText: 'PLAY AGAIN',
+                customClass: { popup: 'swal-custom-popup' }
+            }).then(() => location.reload());
+        }
+        
+        function gameLose() {
+            gameActive = false;
+            Swal.fire({
+                title: 'CAUGHT',
+                text: 'The AI predicted your moves.',
+                icon: 'error',
+                background: '#050505',
+                color: '#ff0055',
+                confirmButtonText: 'RETRY'
+            }).then(() => location.reload());
+        }
+
+        function moveGhosts() {
+            fetch('/move_pacman', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ grid: layout, ghosts: ghosts, playerPos: playerPos, goalPos: goalPos })
+            })
+            .then(res => res.json())
+            .then(data => {
+                drawPaths(data.paths);
+                ghosts = data.ghosts;
+                setTimeout(() => {
+                    drawEntities();
+                    if(gameActive && ghosts.some(g => g[0] === playerPos[0] && g[1] === playerPos[1])) {
+                        gameLose();
+                    }
+                }, 100);
+            });
+        }
+
+        createGrid();
+    </script>
+</body>
+</html>

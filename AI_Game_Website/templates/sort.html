@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEURAL ARENA | Neon Sort</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        /* --- CORE STYLES --- */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: #020202; color: #fff; font-family: 'Rajdhani', sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+            min-height: 100vh; overflow-y: auto; padding-top: 20px; padding-bottom: 50px;
+            user-select: none;
+        }
+        #neural-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; background: radial-gradient(circle at center, #1a001a 0%, #000 100%); }
+        .scanlines { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2)); background-size: 100% 4px; pointer-events: none; z-index: -1; opacity: 0.3; }
+
+        .back-btn { position: absolute; top: 30px; left: 30px; text-decoration: none; color: #ff00ff; font-family: 'Orbitron'; font-size: 1rem; border: 1px solid #ff00ff; padding: 10px 20px; border-radius: 5px; transition: 0.3s; background: rgba(255, 0, 255, 0.1); }
+        .back-btn:hover { background-color: #ff00ff; color: #fff; box-shadow: 0 0 25px #ff00ff; }
+
+        h1 { font-family: 'Orbitron'; font-size: 3.5rem; text-shadow: 0 0 20px #ff00ff; color: #ff00ff; margin-bottom: 30px; margin-top: 40px; }
+
+        /* SORT CONTAINER */
+        #sort-container {
+            display: flex; align-items: flex-end; justify-content: center;
+            width: 800px; height: 400px;
+            border-bottom: 2px solid #ff00ff;
+            gap: 4px; /* Increased gap slightly for manual clicking */
+            padding: 0 10px;
+        }
+
+        .bar {
+            width: 100%;
+            background: linear-gradient(to top, #440044, #ff00ff);
+            transition: height 0.1s, background 0.1s;
+            border-top: 2px solid #fff;
+            box-shadow: 0 0 10px #ff00ff;
+            cursor: pointer; /* Indicates interactivity */
+        }
+        .bar:hover { opacity: 0.8; }
+        
+        .bar.compare { background: #ff0000 !important; box-shadow: 0 0 20px #ff0000; border-color: #ff0000; }
+        .bar.swap { background: #00ff00 !important; box-shadow: 0 0 20px #00ff00; border-color: #00ff00; }
+        .bar.pivot { background: #ffff00 !important; box-shadow: 0 0 20px #ffff00; }
+
+        .controls-area { margin-top: 30px; display: flex; gap: 20px; flex-wrap: wrap; justify-content: center;}
+        button {
+            padding: 10px 30px; font-family: 'Orbitron'; font-size: 1rem; color: #fff; background: #ff00ff;
+            border: none; cursor: pointer; border-radius: 5px; box-shadow: 0 0 20px #ff00ff; transition: 0.3s;
+        }
+        button:hover { transform: scale(1.1); box-shadow: 0 0 40px #ff00ff; }
+        
+        select {
+            padding: 10px; background: #000; color: #ff00ff; border: 1px solid #ff00ff;
+            font-family: 'Orbitron'; font-size: 1rem;
+        }
+
+        .btn-guide { background: transparent; border: 2px solid #ff00ff; color: #ff00ff; }
+        .btn-guide:hover { background: #ff00ff; color: #fff; }
+
+        /* Custom SweetAlert Styles for consistency */
+        .swal-custom-popup { background: #0a0a0a !important; border: 2px solid #ff00ff !important; }
+        .swal-custom-title { color: #ff00ff !important; font-family: 'Orbitron' !important; }
+        .swal-custom-content { color: #ccc !important; font-family: 'Rajdhani' !important; font-size: 1.1rem; }
+    </style>
+</head>
+<body>
+    <canvas id="neural-bg"></canvas>
+    <div class="scanlines"></div>
+
+    <a href="/" class="back-btn">← DASHBOARD</a>
+    <h1>NEON SORT</h1>
+
+    <div id="sort-container"></div>
+
+    <div class="controls-area">
+        <select id="algo-select">
+            <option value="bubble">Bubble Sort (Simple)</option>
+            <option value="quick">Quick Sort (Efficient)</option>
+        </select>
+        <button onclick="initArray()">SCRAMBLE</button>
+        <button onclick="runSort()">VISUALIZE</button>
+        <button class="btn-guide" onclick="showGuide()">MISSION BRIEF</button>
+    </div>
+
+    <script>
+        const bgCanvas = document.getElementById('neural-bg'); const bgCtx = bgCanvas.getContext('2d');
+        bgCanvas.width = window.innerWidth; bgCanvas.height = window.innerHeight;
+        let particles=[]; class Particle{constructor(){this.x=Math.random()*bgCanvas.width;this.y=Math.random()*bgCanvas.height;this.size=Math.random()*2;this.speedX=(Math.random()*1.0)-0.5;this.speedY=(Math.random()*1.0)-0.5;this.color='#ff00ff';}update(){this.x+=this.speedX;this.y+=this.speedY;if(this.x<0||this.x>bgCanvas.width)this.speedX*=-1;if(this.y<0||this.y>bgCanvas.height)this.speedY*=-1;}draw(){bgCtx.fillStyle=this.color;bgCtx.beginPath();bgCtx.arc(this.x,this.y,this.size,0,Math.PI*2);bgCtx.fill();}}
+        function initBg(){particles=[];for(let i=0;i<60;i++)particles.push(new Particle());}
+        function animateBg(){bgCtx.clearRect(0,0,bgCanvas.width,bgCanvas.height);for(let i=0;i<particles.length;i++){particles[i].update();particles[i].draw();connect(i);}requestAnimationFrame(animateBg);}
+        function connect(a){for(let b=a;b<particles.length;b++){let dist=((particles[a].x-particles[b].x)**2+(particles[a].y-particles[b].y)**2);if(dist<(bgCanvas.width/7)*(bgCanvas.height/7)){bgCtx.strokeStyle='rgba(255, 0, 255,'+(1-dist/25000)+')';bgCtx.lineWidth=1;bgCtx.beginPath();bgCtx.moveTo(particles[a].x,particles[a].y);bgCtx.lineTo(particles[b].x,particles[b].y);bgCtx.stroke();}}}
+        window.addEventListener('resize',()=>{bgCanvas.width=window.innerWidth;bgCanvas.height=window.innerHeight;initBg();});initBg(); animateBg();
+    </script>
+
+    <script>
+        let array = [];
+        const SIZE = 20; // Reduced size for playability
+        const container = document.getElementById('sort-container');
+        let isSorting = false;
+        let selectedIndex = null; // Stores the index of the first clicked bar
+
+        function initArray() {
+            if(isSorting) return;
+            array = [];
+            selectedIndex = null;
+            container.innerHTML = '';
+            
+            for(let i=0; i<SIZE; i++) {
+                // Generate bars
+                let val = Math.floor(Math.random() * 300) + 20;
+                array.push(val);
+                
+                let bar = document.createElement('div');
+                bar.className = 'bar';
+                bar.style.height = val + 'px';
+                bar.id = `bar-${i}`;
+                
+                // Add click listener for MANUAL sorting
+                bar.onclick = () => handleManualSort(i);
+                
+                container.appendChild(bar);
+            }
+        }
+
+        // --- MANUAL SORTING LOGIC ---
+        function handleManualSort(index) {
+            if(isSorting) return; // Disable clicking while AI is running
+
+            let bars = document.querySelectorAll('.bar');
+
+            if (selectedIndex === null) {
+                // Select first bar
+                selectedIndex = index;
+                bars[index].style.backgroundColor = '#fff'; // Highlight white
+                bars[index].style.boxShadow = '0 0 20px #fff';
+            } else if (selectedIndex === index) {
+                // Deselect if clicking same bar
+                resetBarVisuals(selectedIndex);
+                selectedIndex = null;
+            } else {
+                // Swap logic
+                swapBars(selectedIndex, index);
+                
+                // Reset visuals
+                resetBarVisuals(selectedIndex);
+                resetBarVisuals(index);
+                
+                selectedIndex = null;
+                checkWin();
+            }
+        }
+
+        function swapBars(i, j) {
+            // Swap in data array
+            let temp = array[i];
+            array[i] = array[j];
+            array[j] = temp;
+
+            // Swap visual heights
+            let bar1 = document.getElementById(`bar-${i}`);
+            let bar2 = document.getElementById(`bar-${j}`);
+            bar1.style.height = array[i] + 'px';
+            bar2.style.height = array[j] + 'px';
+        }
+
+        function resetBarVisuals(idx) {
+            let bar = document.getElementById(`bar-${idx}`);
+            // Reset to default CSS gradient via clearing inline styles (except height)
+            bar.style.backgroundColor = ''; 
+            bar.style.boxShadow = '';
+        }
+
+        function checkWin() {
+            // Check if sorted
+            let sorted = true;
+            for(let i=0; i<array.length-1; i++) {
+                if(array[i] > array[i+1]) {
+                    sorted = false;
+                    break;
+                }
+            }
+            if(sorted) {
+                Swal.fire({
+                    title: "MANUAL SORT COMPLETE",
+                    text: "You organized the data manually!",
+                    background: '#0a0a0a', color: '#ff00ff', icon: 'success',
+                    customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title' }
+                });
+            }
+        }
+
+        // --- AI SORTING ---
+        function runSort() {
+            if(isSorting) return;
+            // Clear manual selection if active
+            if(selectedIndex !== null) resetBarVisuals(selectedIndex);
+            selectedIndex = null;
+            isSorting = true;
+            
+            const algo = document.getElementById('algo-select').value;
+
+            fetch('/solve_sort', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ array: array, algo: algo })
+            })
+            .then(res => res.json())
+            .then(data => {
+                animateSteps(data.steps);
+            })
+            .catch(err => {
+                isSorting = false;
+                console.error(err);
+                Swal.fire({
+                    title: 'CONNECTION ERROR',
+                    text: 'Backend not found. Please ensure the Python server is running.',
+                    icon: 'error',
+                    background: '#0a0a0a', color: '#ff00ff',
+                    customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title' }
+                });
+            });
+        }
+
+        function animateSteps(steps) {
+            let i = 0;
+            let delay = 50; 
+
+            function playStep() {
+                if(i >= steps.length) {
+                    isSorting = false;
+                    Swal.fire({
+                        title: "AI SORT COMPLETE",
+                        text: "Data structured.",
+                        background: '#0a0a0a', color: '#ff00ff', icon: 'success',
+                        timer: 1500, showConfirmButton: false,
+                        customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title' }
+                    });
+                    return;
+                }
+
+                let step = steps[i];
+                // Reset colors slightly (ensure only AI colors are active)
+                document.querySelectorAll('.bar').forEach(b => {
+                    if(!b.style.backgroundColor) b.classList.remove('compare', 'swap', 'pivot');
+                });
+
+                if(step.type === 'compare') {
+                    document.getElementById(`bar-${step.indices[0]}`).classList.add('compare');
+                    document.getElementById(`bar-${step.indices[1]}`).classList.add('compare');
+                } else if(step.type === 'swap') {
+                    // Perform Swap
+                    let idx1 = step.indices[0];
+                    let idx2 = step.indices[1];
+                    let val1 = step.values[0];
+                    let val2 = step.values[1];
+                    
+                    let b1 = document.getElementById(`bar-${idx1}`);
+                    let b2 = document.getElementById(`bar-${idx2}`);
+                    
+                    b1.classList.add('swap');
+                    b2.classList.add('swap');
+                    b1.style.height = val1 + 'px';
+                    b2.style.height = val2 + 'px';
+                    
+                    // Update internal array to match visualization
+                    array[idx1] = val1;
+                    array[idx2] = val2;
+                } else if(step.type === 'pivot') {
+                    document.getElementById(`bar-${step.indices[0]}`).classList.add('pivot');
+                }
+
+                i++;
+                setTimeout(playStep, delay);
+            }
+            playStep();
+        }
+
+        function showGuide() {
+            Swal.fire({
+                title: 'MISSION BRIEF',
+                html: '<strong>MANUAL:</strong> Click two bars to swap them.<br><br><strong>AI:</strong> Select an algorithm and click Visualize.',
+                background: '#0a0a0a', color: '#ff00ff', confirmButtonColor: '#ff00ff',
+                customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title', content: 'swal-custom-content' }
+            });
+        }
+
+        initArray();
+    </script>
+</body>
+</html>

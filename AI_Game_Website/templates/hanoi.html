@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEURAL ARENA | Neon Hanoi</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        /* --- CORE STYLES --- */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: #020202; color: #fff; font-family: 'Rajdhani', sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+            min-height: 100vh; overflow-y: auto; padding-top: 20px; padding-bottom: 50px;
+            user-select: none;
+        }
+        #neural-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; background: radial-gradient(circle at center, #1a1500 0%, #000 100%); }
+        .scanlines { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2)); background-size: 100% 4px; pointer-events: none; z-index: -1; opacity: 0.3; }
+
+        .back-btn { position: absolute; top: 30px; left: 30px; text-decoration: none; color: #ffd700; font-family: 'Orbitron'; font-size: 1rem; border: 1px solid #ffd700; padding: 10px 20px; border-radius: 5px; transition: 0.3s; background: rgba(255, 215, 0, 0.1); }
+        .back-btn:hover { background-color: #ffd700; color: #000; box-shadow: 0 0 25px #ffd700; }
+
+        h1 { font-family: 'Orbitron'; font-size: 3.5rem; text-shadow: 0 0 20px #ffd700; color: #ffd700; margin-bottom: 10px; margin-top: 40px; }
+        .status-bar { font-family: 'Orbitron'; font-size: 1.5rem; margin-bottom: 30px; color: #fff; }
+
+        /* GAME AREA */
+        .game-area {
+            display: flex; justify-content: center; gap: 50px; margin-top: 20px;
+            border-bottom: 5px solid #ffd700; padding-bottom: 0; padding-left: 50px; padding-right: 50px;
+        }
+
+        .tower-container {
+            width: 180px; height: 300px;
+            position: relative;
+            display: flex; flex-direction: column-reverse; align-items: center;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .tower-container:hover::after { background: #ffd700; box-shadow: 0 0 20px #ffd700; }
+
+        /* The Rod */
+        .tower-container::after {
+            content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+            width: 10px; height: 280px; background: #333; border-radius: 5px 5px 0 0;
+            z-index: -1; transition: 0.3s;
+        }
+
+        .disk {
+            height: 35px; border-radius: 10px;
+            background: rgba(255, 215, 0, 0.2);
+            border: 2px solid #ffd700;
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+            margin-bottom: 2px;
+            transition: all 0.3s ease;
+            z-index: 2;
+        }
+        .disk.selected { background: #ffd700; box-shadow: 0 0 25px #ffd700; transform: translateY(-20px); }
+
+        .controls-area { margin-top: 40px; display: flex; gap: 20px; }
+        button {
+            padding: 10px 30px; font-family: 'Orbitron'; font-size: 1rem; color: #000; background: #ffd700;
+            border: none; cursor: pointer; border-radius: 5px; box-shadow: 0 0 20px #ffd700; transition: 0.3s;
+        }
+        button:hover { transform: scale(1.1); box-shadow: 0 0 40px #ffd700; }
+        
+        .btn-guide { background: transparent; border: 2px solid #ffd700; color: #ffd700; }
+        .btn-guide:hover { background: #ffd700; color: #000; }
+
+        .swal-custom-popup { background: #0a0a0a !important; border: 2px solid #ffd700 !important; }
+        .swal-custom-title { color: #ffd700 !important; font-family: 'Orbitron' !important; }
+        .swal-custom-content { color: #ccc !important; font-family: 'Rajdhani' !important; font-size: 1.1rem; text-align: left;}
+    </style>
+</head>
+<body>
+    <canvas id="neural-bg"></canvas>
+    <div class="scanlines"></div>
+
+    <a href="/" class="back-btn">← DASHBOARD</a>
+    <h1>NEON HANOI</h1>
+    <div class="status-bar">MOVES: <span id="moves">0</span></div>
+
+    <div class="game-area">
+        <div class="tower-container" id="tower-0" onclick="clickTower(0)"></div>
+        <div class="tower-container" id="tower-1" onclick="clickTower(1)"></div>
+        <div class="tower-container" id="tower-2" onclick="clickTower(2)"></div>
+    </div>
+
+    <div class="controls-area">
+        <button class="btn-guide" onclick="showGuide()">MISSION BRIEF</button>
+        <button onclick="initGame()">RESET SYSTEM</button>
+        <button onclick="runAI()">AI RECURSION</button>
+    </div>
+
+    <script>
+        const bgCanvas = document.getElementById('neural-bg'); const bgCtx = bgCanvas.getContext('2d');
+        bgCanvas.width = window.innerWidth; bgCanvas.height = window.innerHeight;
+        let particles=[]; class Particle{constructor(){this.x=Math.random()*bgCanvas.width;this.y=Math.random()*bgCanvas.height;this.size=Math.random()*2;this.speedX=(Math.random()*1.0)-0.5;this.speedY=(Math.random()*1.0)-0.5;this.color='#ffd700';}update(){this.x+=this.speedX;this.y+=this.speedY;if(this.x<0||this.x>bgCanvas.width)this.speedX*=-1;if(this.y<0||this.y>bgCanvas.height)this.speedY*=-1;}draw(){bgCtx.fillStyle=this.color;bgCtx.beginPath();bgCtx.arc(this.x,this.y,this.size,0,Math.PI*2);bgCtx.fill();}}
+        function init(){particles=[];for(let i=0;i<60;i++)particles.push(new Particle());}
+        function animate(){bgCtx.clearRect(0,0,bgCanvas.width,bgCanvas.height);for(let i=0;i<particles.length;i++){particles[i].update();particles[i].draw();connect(i);}requestAnimationFrame(animate);}
+        function connect(a){for(let b=a;b<particles.length;b++){let dist=((particles[a].x-particles[b].x)**2+(particles[a].y-particles[b].y)**2);if(dist<(bgCanvas.width/7)*(bgCanvas.height/7)){bgCtx.strokeStyle='rgba(255, 215, 0,'+(1-dist/25000)+')';bgCtx.lineWidth=1;bgCtx.beginPath();bgCtx.moveTo(particles[a].x,particles[a].y);bgCtx.lineTo(particles[b].x,particles[b].y);bgCtx.stroke();}}}
+        window.addEventListener('resize',()=>{bgCanvas.width=window.innerWidth;bgCanvas.height=window.innerHeight;init();});init();animate();
+    </script>
+
+    <script>
+        const DISK_COUNT = 5;
+        let towers = [[], [], []]; // 0, 1, 2
+        let selectedDisk = null;
+        let selectedTowerIdx = -1;
+        let moveCount = 0;
+        let isProcessing = false;
+
+        function initGame() {
+            towers = [[], [], []];
+            // Create Disks (Largest to Smallest)
+            for(let i = DISK_COUNT; i >= 1; i--) {
+                towers[0].push(i);
+            }
+            selectedDisk = null;
+            selectedTowerIdx = -1;
+            moveCount = 0;
+            isProcessing = false;
+            updateUI();
+        }
+
+        function updateUI() {
+            document.getElementById('moves').innerText = moveCount;
+            
+            for(let i=0; i<3; i++) {
+                let div = document.getElementById(`tower-${i}`);
+                div.innerHTML = '';
+                towers[i].forEach(size => {
+                    let disk = document.createElement('div');
+                    disk.className = 'disk';
+                    disk.style.width = (40 + (size * 25)) + 'px'; // Dynamic width
+                    if(selectedDisk === size && selectedTowerIdx === i) disk.classList.add('selected');
+                    div.appendChild(disk);
+                });
+            }
+        }
+
+        function clickTower(idx) {
+            if(isProcessing) return;
+
+            // Deselect
+            if(selectedTowerIdx === idx) {
+                selectedDisk = null;
+                selectedTowerIdx = -1;
+                updateUI();
+                return;
+            }
+
+            // Select
+            if(selectedDisk === null) {
+                if(towers[idx].length > 0) {
+                    selectedTowerIdx = idx;
+                    selectedDisk = towers[idx][towers[idx].length - 1]; // Top disk
+                    updateUI();
+                }
+            } 
+            // Move
+            else {
+                let targetTop = towers[idx].length > 0 ? towers[idx][towers[idx].length - 1] : 999;
+                
+                if(selectedDisk < targetTop) {
+                    // Valid Move
+                    towers[selectedTowerIdx].pop();
+                    towers[idx].push(selectedDisk);
+                    moveCount++;
+                    selectedDisk = null;
+                    selectedTowerIdx = -1;
+                    updateUI();
+                    checkWin();
+                } else {
+                    // Invalid Move animation
+                    let tDiv = document.getElementById(`tower-${idx}`);
+                    tDiv.style.backgroundColor = 'rgba(255,0,0,0.2)';
+                    setTimeout(() => tDiv.style.backgroundColor = 'transparent', 200);
+                }
+            }
+        }
+
+        function checkWin() {
+            if(towers[2].length === DISK_COUNT) {
+                Swal.fire({
+                    title: "SEQUENCE COMPLETE",
+                    text: `Solved in ${moveCount} moves.`,
+                    background: '#0a0a0a', color: '#ffd700', icon: 'success',
+                    confirmButtonText: 'RESTART',
+                    customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title' }
+                }).then(initGame);
+            }
+        }
+
+        function showGuide() {
+            Swal.fire({
+                title: 'MISSION BRIEF',
+                html: `
+                    <ul style="list-style: none; padding: 0; text-align: left;">
+                        <li style="margin-bottom: 10px;">► <strong>GOAL:</strong> Move the stack of disks from the Left Tower to the Right Tower.</li>
+                        <li style="margin-bottom: 10px;">► <strong>RULES:</strong> 
+                            <br>1. Only one disk can be moved at a time.
+                            <br>2. A larger disk cannot be placed on top of a smaller disk.
+                        </li>
+                        <li style="margin-bottom: 10px;">► <strong>AI ASSIST:</strong> The AI uses a recursive algorithm to solve this in the minimum possible moves ($2^n - 1$).</li>
+                    </ul>
+                `,
+                background: '#0a0a0a', color: '#ffd700',
+                confirmButtonText: 'ACKNOWLEDGED',
+                confirmButtonColor: '#ffd700',
+                customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title', content: 'swal-custom-content' }
+            });
+        }
+
+        // --- AI LOGIC ---
+        function runAI() {
+            if(isProcessing) return;
+            initGame(); // Reset to clean state for AI
+            isProcessing = true;
+
+            fetch('/solve_hanoi', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ disks: DISK_COUNT })
+            })
+            .then(res => res.json())
+            .then(moves => {
+                let i = 0;
+                function playNext() {
+                    if(i >= moves.length) {
+                        isProcessing = false;
+                        checkWin();
+                        return;
+                    }
+                    
+                    let move = moves[i];
+                    let disk = towers[move.from].pop();
+                    towers[move.to].push(disk);
+                    moveCount++;
+                    updateUI();
+                    
+                    i++;
+                    setTimeout(playNext, 300); // Animation speed
+                }
+                playNext();
+            });
+        }
+
+        initGame();
+    </script>
+</body>
+</html>

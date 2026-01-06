@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEURAL ARENA | Neon Breakout</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        /* --- CORE STYLES --- */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: #020202; color: #fff; font-family: 'Rajdhani', sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+            min-height: 100vh; overflow-y: auto; padding-top: 20px; padding-bottom: 50px;
+            user-select: none;
+        }
+        #neural-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; background: radial-gradient(circle at center, #001a1a 0%, #000 100%); }
+        .scanlines { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2)); background-size: 100% 4px; pointer-events: none; z-index: -1; opacity: 0.3; }
+
+        .back-btn { position: absolute; top: 30px; left: 30px; text-decoration: none; color: #00ffff; font-family: 'Orbitron'; font-size: 1rem; border: 1px solid #00ffff; padding: 10px 20px; border-radius: 5px; transition: 0.3s; background: rgba(0, 255, 255, 0.1); }
+        .back-btn:hover { background-color: #00ffff; color: #000; box-shadow: 0 0 25px #00ffff; }
+
+        h1 { font-family: 'Orbitron'; font-size: 3.5rem; text-shadow: 0 0 20px #00ffff; color: #00ffff; margin-bottom: 10px; margin-top: 40px; }
+        .score-board { font-family: 'Orbitron'; font-size: 2rem; margin-bottom: 15px; color: #fff; }
+
+        #gameCanvas {
+            background: rgba(0, 20, 20, 0.8);
+            border: 2px solid #00ffff;
+            box-shadow: 0 0 40px rgba(0, 255, 255, 0.2);
+            border-radius: 5px;
+            cursor: none; /* Hide cursor inside game for immersion */
+        }
+
+        .controls-area { margin-top: 20px; display: flex; gap: 20px; }
+        
+        button {
+            padding: 10px 30px; font-family: 'Orbitron'; font-size: 1rem; color: #000; background: #00ffff;
+            border: none; cursor: pointer; border-radius: 5px; box-shadow: 0 0 20px #00ffff; transition: 0.3s;
+        }
+        button:hover { transform: scale(1.1); box-shadow: 0 0 40px #00ffff; }
+        
+        .btn-ai.active { background: #ff0055; color: #fff; box-shadow: 0 0 20px #ff0055; }
+        
+        .instructions { margin-top: 15px; color: #888; font-family: 'Orbitron'; letter-spacing: 1px; font-size: 0.9rem; }
+
+        .swal-custom-popup { background: #0a0a0a !important; border: 2px solid #00ffff !important; }
+        .swal-custom-title { color: #00ffff !important; font-family: 'Orbitron' !important; }
+    </style>
+</head>
+<body>
+    <canvas id="neural-bg"></canvas>
+    <div class="scanlines"></div>
+
+    <a href="/" class="back-btn">← DASHBOARD</a>
+    <h1>NEON BREAKOUT</h1>
+    <div class="score-board">SCORE: <span id="score">0</span></div>
+
+    <canvas id="gameCanvas" width="800" height="500"></canvas>
+
+    <div class="controls-area">
+        <button onclick="startGame()">RESTART MISSION</button>
+        <button id="aiBtn" class="btn-ai" onclick="toggleAI()">ACTIVATE AI PILOT</button>
+    </div>
+    
+    <div class="instructions">CONTROLS: MOUSE or LEFT/RIGHT ARROW KEYS</div>
+
+    <script>
+        const bgCanvas = document.getElementById('neural-bg'); const bgCtx = bgCanvas.getContext('2d');
+        bgCanvas.width = window.innerWidth; bgCanvas.height = window.innerHeight;
+        let bgParticles=[]; class Particle{constructor(){this.x=Math.random()*bgCanvas.width;this.y=Math.random()*bgCanvas.height;this.size=Math.random()*2;this.speedX=(Math.random()*1.5)-0.75;this.speedY=(Math.random()*1.5)-0.75;this.color='#00ffff';}update(){this.x+=this.speedX;this.y+=this.speedY;if(this.x<0||this.x>bgCanvas.width)this.speedX*=-1;if(this.y<0||this.y>bgCanvas.height)this.speedY*=-1;}draw(){bgCtx.fillStyle=this.color;bgCtx.beginPath();bgCtx.arc(this.x,this.y,this.size,0,Math.PI*2);bgCtx.fill();}}
+        function initBg(){bgParticles=[];for(let i=0;i<80;i++)bgParticles.push(new Particle());}
+        function animateBg(){bgCtx.clearRect(0,0,bgCanvas.width,bgCanvas.height);for(let i=0;i<bgParticles.length;i++){bgParticles[i].update();bgParticles[i].draw();connect(i);}requestAnimationFrame(animateBg);}
+        function connect(a){for(let b=a;b<bgParticles.length;b++){let dist=((bgParticles[a].x-bgParticles[b].x)**2+(bgParticles[a].y-bgParticles[b].y)**2);if(dist<(bgCanvas.width/7)*(bgCanvas.height/7)){bgCtx.strokeStyle='rgba(0, 255, 255,'+(1-dist/20000)+')';bgCtx.lineWidth=1;bgCtx.beginPath();bgCtx.moveTo(bgParticles[a].x,bgParticles[a].y);bgCtx.lineTo(bgParticles[b].x,bgParticles[b].y);bgCtx.stroke();}}}
+        window.addEventListener('resize',()=>{bgCanvas.width=window.innerWidth;bgCanvas.height=window.innerHeight;initBg();});initBg();animateBg();
+    </script>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let ball = { x: 400, y: 300, dx: 4, dy: -4, radius: 8 };
+        let paddle = { x: 350, y: 480, width: 100, height: 10, speed: 7 };
+        let bricks = [];
+        let particles = []; 
+        let score = 0;
+        let isAI = false;
+        let gameRunning = true;
+        
+        // Keyboard State
+        let rightPressed = false;
+        let leftPressed = false;
+
+        const brickRowCount = 5;
+        const brickColumnCount = 9;
+        const brickWidth = 75;
+        const brickHeight = 20;
+        const brickPadding = 10;
+        const brickOffsetTop = 30;
+        const brickOffsetLeft = 25;
+
+        function initBricks() {
+            bricks = [];
+            for(let c=0; c<brickColumnCount; c++) {
+                bricks[c] = [];
+                for(let r=0; r<brickRowCount; r++) {
+                    bricks[c][r] = { x: 0, y: 0, status: 1, color: `hsl(${c * 40}, 100%, 50%)` };
+                }
+            }
+        }
+
+        function createExplosion(x, y, color) {
+            for(let i=0; i<10; i++) {
+                particles.push({
+                    x: x, y: y,
+                    dx: (Math.random() - 0.5) * 5,
+                    dy: (Math.random() - 0.5) * 5,
+                    life: 1,
+                    color: color
+                });
+            }
+        }
+
+        function drawParticles() {
+            for(let i=0; i<particles.length; i++) {
+                let p = particles[i];
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 3, 0, Math.PI*2);
+                ctx.fill();
+                p.x += p.dx;
+                p.y += p.dy;
+                p.life -= 0.05;
+            }
+            particles = particles.filter(p => p.life > 0);
+            ctx.globalAlpha = 1;
+        }
+
+        function drawBall() {
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI*2);
+            ctx.fillStyle = "#00ffff";
+            ctx.shadowBlur = 10; ctx.shadowColor = "#00ffff";
+            ctx.fill();
+            ctx.closePath();
+            ctx.shadowBlur = 0;
+        }
+
+        function drawPaddle() {
+            ctx.beginPath();
+            ctx.rect(paddle.x, paddle.y, paddle.width, paddle.height);
+            ctx.fillStyle = "#fff";
+            ctx.shadowBlur = 10; ctx.shadowColor = "#fff";
+            ctx.fill();
+            ctx.closePath();
+            ctx.shadowBlur = 0;
+        }
+
+        function drawBricks() {
+            for(let c=0; c<brickColumnCount; c++) {
+                for(let r=0; r<brickRowCount; r++) {
+                    if(bricks[c][r].status === 1) {
+                        let brickX = (c*(brickWidth+brickPadding)) + brickOffsetLeft;
+                        let brickY = (r*(brickHeight+brickPadding)) + brickOffsetTop;
+                        bricks[c][r].x = brickX;
+                        bricks[c][r].y = brickY;
+                        ctx.beginPath();
+                        ctx.rect(brickX, brickY, brickWidth, brickHeight);
+                        ctx.fillStyle = bricks[c][r].color;
+                        ctx.shadowBlur = 5; ctx.shadowColor = bricks[c][r].color;
+                        ctx.fill();
+                        ctx.closePath();
+                        ctx.shadowBlur = 0;
+                    }
+                }
+            }
+        }
+
+        function collisionDetection() {
+            for(let c=0; c<brickColumnCount; c++) {
+                for(let r=0; r<brickRowCount; r++) {
+                    let b = bricks[c][r];
+                    if(b.status === 1) {
+                        if(ball.x > b.x && ball.x < b.x+brickWidth && ball.y > b.y && ball.y < b.y+brickHeight) {
+                            ball.dy = -ball.dy;
+                            b.status = 0;
+                            score++;
+                            createExplosion(b.x + brickWidth/2, b.y + brickHeight/2, b.color);
+                            document.getElementById('score').innerText = score;
+                            if(score === brickRowCount*brickColumnCount) {
+                                gameOver("MISSION COMPLETE! YOU WIN.");
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        function update() {
+            if(!gameRunning) return;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawBricks();
+            drawBall();
+            drawPaddle();
+            drawParticles();
+            collisionDetection();
+
+            // Wall Collision
+            if(ball.x + ball.dx > canvas.width-ball.radius || ball.x + ball.dx < ball.radius) {
+                ball.dx = -ball.dx;
+            }
+            if(ball.y + ball.dy < ball.radius) {
+                ball.dy = -ball.dy;
+            } else if(ball.y + ball.dy > canvas.height-ball.radius) {
+                // Paddle Collision
+                if(ball.x > paddle.x && ball.x < paddle.x + paddle.width) {
+                    ball.dy = -ball.dy;
+                    // Angle logic
+                    let collidePoint = ball.x - (paddle.x + paddle.width/2);
+                    ball.dx = collidePoint * 0.15; 
+                } else {
+                    gameOver("SYSTEM FAILURE! BALL LOST.");
+                    return;
+                }
+            }
+
+            ball.x += ball.dx;
+            ball.y += ball.dy;
+
+            // --- MOVEMENT LOGIC ---
+            if(isAI) {
+                // AI Logic (IMPROVED SPEED)
+                let targetX = ball.x - paddle.width/2;
+                paddle.x += (targetX - paddle.x) * 0.25; // Faster Reflexes (0.25 instead of 0.1)
+            } else {
+                // Keyboard Logic
+                if(rightPressed && paddle.x < canvas.width - paddle.width) {
+                    paddle.x += paddle.speed;
+                } else if(leftPressed && paddle.x > 0) {
+                    paddle.x -= paddle.speed;
+                }
+            }
+
+            // Keep paddle on screen
+            if(paddle.x < 0) paddle.x = 0;
+            if(paddle.x + paddle.width > canvas.width) paddle.x = canvas.width - paddle.width;
+
+            requestAnimationFrame(update);
+        }
+
+        // --- CONTROLS ---
+        
+        // Key Listeners
+        document.addEventListener("keydown", keyDownHandler, false);
+        document.addEventListener("keyup", keyUpHandler, false);
+
+        function keyDownHandler(e) {
+            if(e.key === "Right" || e.key === "ArrowRight") rightPressed = true;
+            else if(e.key === "Left" || e.key === "ArrowLeft") leftPressed = true;
+        }
+
+        function keyUpHandler(e) {
+            if(e.key === "Right" || e.key === "ArrowRight") rightPressed = false;
+            else if(e.key === "Left" || e.key === "ArrowLeft") leftPressed = false;
+        }
+
+        // Mouse Listener
+        canvas.addEventListener("mousemove", (e) => {
+            if(!isAI && gameRunning) {
+                let relativeX = e.clientX - canvas.getBoundingClientRect().left;
+                if(relativeX > 0 && relativeX < canvas.width) {
+                    paddle.x = relativeX - paddle.width/2;
+                }
+            }
+        });
+
+        function toggleAI() {
+            isAI = !isAI;
+            const btn = document.getElementById('aiBtn');
+            if(isAI) {
+                btn.innerText = "DEACTIVATE AI";
+                btn.classList.add('active');
+            } else {
+                btn.innerText = "ACTIVATE AI PILOT";
+                btn.classList.remove('active');
+            }
+        }
+
+        function gameOver(msg) {
+            gameRunning = false;
+            let col = msg.includes("WIN") ? "#00ffff" : "#ff0055";
+            let ico = msg.includes("WIN") ? "success" : "error";
+            Swal.fire({
+                title: msg,
+                background: '#0a0a0a', color: col, icon: ico,
+                confirmButtonText: 'RESTART',
+                customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title' }
+            }).then(() => startGame());
+        }
+
+        function startGame() {
+            score = 0;
+            document.getElementById('score').innerText = 0;
+            ball = { x: canvas.width/2, y: canvas.height-30, dx: 4, dy: -4, radius: 8 };
+            paddle = { x: (canvas.width-100)/2, y: 480, width: 100, height: 10, speed: 7 };
+            rightPressed = false;
+            leftPressed = false;
+            initBricks();
+            gameRunning = true;
+            update();
+        }
+
+        startGame();
+    </script>
+</body>
+</html>

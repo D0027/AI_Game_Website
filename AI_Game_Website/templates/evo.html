@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEURAL ARENA | Neon Evo</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        /* --- CORE STYLES --- */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: #020202; color: #fff; font-family: 'Rajdhani', sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+            min-height: 100vh; overflow-y: auto; padding-top: 20px; padding-bottom: 50px;
+            user-select: none;
+        }
+        #neural-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; background: radial-gradient(circle at center, #1a001a 0%, #000 100%); }
+        .scanlines { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2)); background-size: 100% 4px; pointer-events: none; z-index: -1; opacity: 0.3; }
+
+        .back-btn { position: absolute; top: 30px; left: 30px; text-decoration: none; color: #bf00ff; font-family: 'Orbitron'; font-size: 1rem; border: 1px solid #bf00ff; padding: 10px 20px; border-radius: 5px; transition: 0.3s; background: rgba(191, 0, 255, 0.1); }
+        .back-btn:hover { background-color: #bf00ff; color: #fff; box-shadow: 0 0 25px #bf00ff; }
+
+        h1 { font-family: 'Orbitron'; font-size: 3.5rem; text-shadow: 0 0 20px #bf00ff; color: #bf00ff; margin-bottom: 30px; margin-top: 40px; }
+
+        /* EVO UI */
+        .input-group { margin-bottom: 30px; display: flex; gap: 10px; z-index: 10; }
+        input {
+            background: #111; border: 1px solid #bf00ff; color: #fff;
+            padding: 10px 20px; font-family: 'Orbitron'; font-size: 1.2rem;
+            text-transform: uppercase; width: 300px; text-align: center;
+        }
+        
+        .main-display {
+            background: rgba(20, 0, 30, 0.8);
+            border: 2px solid #bf00ff;
+            padding: 40px; border-radius: 10px;
+            text-align: center; width: 80%; max-width: 800px;
+            box-shadow: 0 0 40px rgba(191, 0, 255, 0.2);
+            margin-bottom: 20px;
+        }
+
+        #best-match {
+            font-family: 'Orbitron'; font-size: 3rem; letter-spacing: 5px;
+            color: #fff; text-shadow: 0 0 15px #bf00ff;
+            min-height: 60px;
+            word-break: break-all;
+        }
+
+        .stats-row {
+            display: flex; justify-content: space-around; margin-top: 20px;
+            font-size: 1.2rem; color: #aaa; border-top: 1px solid #333; padding-top: 15px;
+        }
+        .stat-val { color: #bf00ff; font-weight: bold; }
+
+        /* Population Stream */
+        .population-stream {
+            display: flex; flex-wrap: wrap; justify-content: center; gap: 10px;
+            width: 90%; max-width: 1000px; height: 200px; overflow: hidden;
+            opacity: 0.5; font-family: monospace; color: #aaa;
+            mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
+        }
+        .pop-item { font-size: 0.9rem; }
+
+        .controls-area { margin-top: 20px; display: flex; gap: 20px; }
+        button {
+            padding: 10px 30px; font-family: 'Orbitron'; font-size: 1rem; color: #fff; background: #bf00ff;
+            border: none; cursor: pointer; border-radius: 5px; box-shadow: 0 0 20px #bf00ff; transition: 0.3s;
+        }
+        button:hover { transform: scale(1.1); box-shadow: 0 0 40px #bf00ff; }
+        .btn-guide { background: transparent; border: 2px solid #bf00ff; color: #bf00ff; }
+        .btn-guide:hover { background: #bf00ff; color: #fff; }
+
+        .swal-custom-popup { background: #0a0a0a !important; border: 2px solid #bf00ff !important; }
+        .swal-custom-title { color: #bf00ff !important; font-family: 'Orbitron' !important; }
+        .swal-custom-content { color: #ccc !important; font-family: 'Rajdhani' !important; font-size: 1.1rem; text-align: left;}
+    </style>
+</head>
+<body>
+    <canvas id="neural-bg"></canvas>
+    <div class="scanlines"></div>
+
+    <a href="/" class="back-btn">← DASHBOARD</a>
+    <h1>NEON EVO</h1>
+
+    <div class="input-group">
+        <input type="text" id="targetPhrase" value="NEURAL ARENA" maxlength="20">
+        <button onclick="startEvolution()">EVOLVE</button>
+    </div>
+
+    <div class="main-display">
+        <div id="best-match">Waiting for DNA...</div>
+        <div class="stats-row">
+            <div>GENERATION: <span id="gen" class="stat-val">0</span></div>
+            <div>FITNESS: <span id="fit" class="stat-val">0%</span></div>
+            <div>POPULATION: <span class="stat-val">100</span></div>
+        </div>
+    </div>
+
+    <div class="population-stream" id="popStream"></div>
+
+    <div class="controls-area">
+        <button class="btn-guide" onclick="showGuide()">MISSION BRIEF</button>
+        <button class="btn-guide" onclick="location.reload()">RESET LAB</button>
+    </div>
+
+    <script>
+        const bgCanvas = document.getElementById('neural-bg'); const bgCtx = bgCanvas.getContext('2d');
+        bgCanvas.width = window.innerWidth; bgCanvas.height = window.innerHeight;
+        let particles=[]; class Particle{constructor(){this.x=Math.random()*bgCanvas.width;this.y=Math.random()*bgCanvas.height;this.size=Math.random()*2;this.speedX=(Math.random()*1.0)-0.5;this.speedY=(Math.random()*1.0)-0.5;this.color='#bf00ff';}update(){this.x+=this.speedX;this.y+=this.speedY;if(this.x<0||this.x>bgCanvas.width)this.speedX*=-1;if(this.y<0||this.y>bgCanvas.height)this.speedY*=-1;}draw(){bgCtx.fillStyle=this.color;bgCtx.beginPath();bgCtx.arc(this.x,this.y,this.size,0,Math.PI*2);bgCtx.fill();}}
+        function initBg(){particles=[];for(let i=0;i<60;i++)particles.push(new Particle());}
+        function animateBg(){bgCtx.clearRect(0,0,bgCanvas.width,bgCanvas.height);for(let i=0;i<particles.length;i++){particles[i].update();particles[i].draw();connect(i);}requestAnimationFrame(animateBg);}
+        function connect(a){for(let b=a;b<particles.length;b++){let dist=((particles[a].x-particles[b].x)**2+(particles[a].y-particles[b].y)**2);if(dist<(bgCanvas.width/7)*(bgCanvas.height/7)){bgCtx.strokeStyle='rgba(191, 0, 255,'+(1-dist/25000)+')';bgCtx.lineWidth=1;bgCtx.beginPath();bgCtx.moveTo(particles[a].x,particles[a].y);bgCtx.lineTo(particles[b].x,particles[b].y);bgCtx.stroke();}}}
+        window.addEventListener('resize',()=>{bgCanvas.width=window.innerWidth;bgCanvas.height=window.innerHeight;initBg();});initBg(); animateBg();
+    </script>
+
+    <script>
+        let population = [];
+        let target = "";
+        let generation = 0;
+        let isRunning = false;
+        const POP_SIZE = 100;
+        const CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ ";
+
+        function randomString(len) {
+            let res = "";
+            for(let i=0; i<len; i++) res += CHARS.charAt(Math.floor(Math.random() * CHARS.length));
+            return res;
+        }
+
+        function startEvolution() {
+            if(isRunning) return;
+            
+            let input = document.getElementById('targetPhrase');
+            target = input.value.toUpperCase();
+            if(target.trim() === "") target = "NEURAL ARENA";
+            input.value = target;
+            
+            // Init Population
+            population = [];
+            for(let i=0; i<POP_SIZE; i++) population.push(randomString(target.length));
+            
+            generation = 0;
+            isRunning = true;
+            loop();
+        }
+
+        function loop() {
+            if(!isRunning) return;
+
+            fetch('/solve_evo', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ target: target, population: population })
+            })
+            .then(res => res.json())
+            .then(data => {
+                population = data.population;
+                let best = data.best;
+                let fitness = data.fitness;
+                
+                // Update UI
+                document.getElementById('best-match').innerText = best;
+                document.getElementById('gen').innerText = generation;
+                document.getElementById('fit').innerText = fitness.toFixed(1) + "%";
+                
+                // Visualization
+                let stream = document.getElementById('popStream');
+                stream.innerHTML = population.slice(0, 30).map(s => `<div class="pop-item">${s}</div>`).join('');
+
+                if(fitness >= 100) {
+                    isRunning = false;
+                    Swal.fire({
+                        title: "EVOLUTION COMPLETE",
+                        text: `Target reached in ${generation} generations.`,
+                        background: '#0a0a0a', color: '#bf00ff', icon: 'success',
+                        customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title' }
+                    });
+                } else {
+                    generation++;
+                    requestAnimationFrame(loop); // Fixed syntax error here
+                }
+            });
+        }
+
+        function showGuide() {
+            Swal.fire({
+                title: 'MISSION BRIEF',
+                html: `
+                    <ul style="list-style: none; padding: 0; text-align: left;">
+                        <li style="margin-bottom: 10px;">► <strong>GOAL:</strong> Evolve random noise into a specific target phrase.</li>
+                        <li style="margin-bottom: 10px;">► <strong>PROCESS:</strong> 
+                            <br>1. <strong>Selection:</strong> The strings closest to the target survive.
+                            <br>2. <strong>Crossover:</strong> Survivors combine DNA (characters).
+                            <br>3. <strong>Mutation:</strong> Random changes introduce new traits.
+                        </li>
+                    </ul>
+                `,
+                background: '#0a0a0a', color: '#bf00ff',
+                confirmButtonText: 'ACKNOWLEDGED',
+                confirmButtonColor: '#bf00ff',
+                customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title', content: 'swal-custom-content' }
+            });
+        }
+    </script>
+</body>
+</html>

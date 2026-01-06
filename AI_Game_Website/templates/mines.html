@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEURAL ARENA | Neon Mines</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        /* --- CORE STYLES --- */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: #020202; color: #fff; font-family: 'Rajdhani', sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+            min-height: 100vh; overflow-y: auto; padding-top: 20px; padding-bottom: 50px;
+            user-select: none; /* Prevent text selection on rapid clicks */
+        }
+        #neural-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; background: radial-gradient(circle at center, #1a0014 0%, #000 100%); }
+        .scanlines { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2)); background-size: 100% 4px; pointer-events: none; z-index: -1; opacity: 0.3; }
+
+        .back-btn { position: absolute; top: 30px; left: 30px; text-decoration: none; color: #ff00cc; font-family: 'Orbitron'; font-size: 1rem; border: 1px solid #ff00cc; padding: 10px 20px; border-radius: 5px; transition: 0.3s; background: rgba(255, 0, 204, 0.1); }
+        .back-btn:hover { background-color: #ff00cc; color: #000; box-shadow: 0 0 25px #ff00cc; }
+
+        h1 { font-family: 'Orbitron'; font-size: 3.5rem; text-shadow: 0 0 20px #ff00cc; color: #ff00cc; margin-bottom: 10px; margin-top: 40px; }
+        
+        .status-bar { font-family: 'Orbitron'; font-size: 1.5rem; margin-bottom: 15px; color: #fff; }
+        
+        #game-grid {
+            display: grid;
+            grid-template-columns: repeat(10, 40px); /* 10x10 Grid */
+            grid-template-rows: repeat(10, 40px);
+            gap: 2px;
+            background: #222;
+            border: 2px solid #ff00cc;
+            box-shadow: 0 0 40px rgba(255, 0, 204, 0.2);
+            padding: 5px;
+        }
+
+        .cell {
+            width: 40px; height: 40px;
+            background: #111;
+            display: flex; align-items: center; justify-content: center;
+            font-family: 'Orbitron'; font-weight: bold; cursor: pointer;
+            transition: background 0.2s;
+        }
+        .cell:hover { background: #333; }
+        
+        /* Cell States */
+        .cell.revealed { background: #000; border: 1px solid #333; cursor: default; }
+        .cell.mine { background: #ff0000 !important; box-shadow: inset 0 0 10px #000; }
+        .cell.flag { color: #ff00cc; text-shadow: 0 0 5px #ff00cc; font-size: 1.2rem; }
+        
+        /* Number Colors */
+        .c-1 { color: #00ccff; } .c-2 { color: #00ff00; } .c-3 { color: #ffcc00; } .c-4 { color: #ff00cc; }
+        .c-5 { color: #ff0000; } .c-6 { color: #00ffff; } .c-7 { color: #fff; } .c-8 { color: #888; }
+
+        .controls-area { margin-top: 20px; display: flex; gap: 20px; }
+        button {
+            padding: 10px 30px; font-family: 'Orbitron'; font-size: 1rem; color: #000; background: #ff00cc;
+            border: none; cursor: pointer; border-radius: 5px; box-shadow: 0 0 20px #ff00cc; transition: 0.3s;
+        }
+        button:hover { transform: scale(1.1); box-shadow: 0 0 40px #ff00cc; }
+        
+        /* Guide Button Style */
+        .btn-guide { background: transparent; border: 2px solid #ff00cc; color: #ff00cc; }
+        .btn-guide:hover { background: #ff00cc; color: #000; }
+        
+        .swal-custom-popup { background: #0a0a0a !important; border: 2px solid #ff00cc !important; }
+        .swal-custom-title { color: #ff00cc !important; font-family: 'Orbitron' !important; }
+        .swal-custom-content { color: #ccc !important; font-family: 'Rajdhani' !important; font-size: 1.1rem; text-align: left;}
+    </style>
+</head>
+<body>
+    <canvas id="neural-bg"></canvas>
+    <div class="scanlines"></div>
+
+    <a href="/" class="back-btn">← DASHBOARD</a>
+    <h1>NEON MINES</h1>
+    <div class="status-bar">MINES DETECTED: <span id="mine-count">15</span></div>
+
+    <div id="game-grid" oncontextmenu="return false;"></div>
+
+    <div class="controls-area">
+        <button class="btn-guide" onclick="showGuide()">MISSION BRIEF</button>
+        <button onclick="location.reload()">RESET SYSTEM</button>
+        <button onclick="runAI()">AI SCAN ASSIST</button>
+    </div>
+
+    <script>
+        const bgCanvas = document.getElementById('neural-bg'); const bgCtx = bgCanvas.getContext('2d');
+        bgCanvas.width = window.innerWidth; bgCanvas.height = window.innerHeight;
+        let particles=[]; class Particle{constructor(){this.x=Math.random()*bgCanvas.width;this.y=Math.random()*bgCanvas.height;this.size=Math.random()*2;this.speedX=(Math.random()*1.5)-0.75;this.speedY=(Math.random()*1.5)-0.75;this.color='#ff00cc';}update(){this.x+=this.speedX;this.y+=this.speedY;if(this.x<0||this.x>bgCanvas.width)this.speedX*=-1;if(this.y<0||this.y>bgCanvas.height)this.speedY*=-1;}draw(){bgCtx.fillStyle=this.color;bgCtx.beginPath();bgCtx.arc(this.x,this.y,this.size,0,Math.PI*2);bgCtx.fill();}}
+        function init(){particles=[];for(let i=0;i<80;i++)particles.push(new Particle());}
+        function animate(){bgCtx.clearRect(0,0,bgCanvas.width,bgCanvas.height);for(let i=0;i<particles.length;i++){particles[i].update();particles[i].draw();connect(i);}requestAnimationFrame(animate);}
+        function connect(a){for(let b=a;b<particles.length;b++){let dist=((particles[a].x-particles[b].x)**2+(particles[a].y-particles[b].y)**2);if(dist<(bgCanvas.width/7)*(bgCanvas.height/7)){bgCtx.strokeStyle='rgba(255, 0, 204,'+(1-dist/20000)+')';bgCtx.lineWidth=1;bgCtx.beginPath();bgCtx.moveTo(particles[a].x,particles[a].y);bgCtx.lineTo(particles[b].x,particles[b].y);bgCtx.stroke();}}}
+        window.addEventListener('resize',()=>{bgCanvas.width=window.innerWidth;bgCanvas.height=window.innerHeight;init();});init();animate();
+    </script>
+
+    <script>
+        const rows = 10;
+        const cols = 10;
+        const totalMines = 15;
+        let grid = [];
+        let gameOver = false;
+        let mineCount = totalMines;
+
+        function initGame() {
+            const gridEl = document.getElementById('game-grid');
+            gridEl.innerHTML = '';
+            grid = [];
+            mineCount = totalMines;
+            document.getElementById('mine-count').innerText = mineCount;
+            gameOver = false;
+
+            // Create Grid Structure
+            for(let r=0; r<rows; r++) {
+                let row = [];
+                for(let c=0; c<cols; c++) {
+                    let cell = { 
+                        r: r, c: c, 
+                        isMine: false, 
+                        revealed: false, 
+                        flagged: false, 
+                        neighborCount: 0 
+                    };
+                    row.push(cell);
+                    
+                    let div = document.createElement('div');
+                    div.className = 'cell';
+                    div.id = `cell-${r}-${c}`;
+                    div.onclick = () => reveal(r, c);
+                    div.oncontextmenu = (e) => { e.preventDefault(); flag(r, c); };
+                    gridEl.appendChild(div);
+                }
+                grid.push(row);
+            }
+
+            // Place Mines
+            let minesPlaced = 0;
+            while(minesPlaced < totalMines) {
+                let r = Math.floor(Math.random() * rows);
+                let c = Math.floor(Math.random() * cols);
+                if(!grid[r][c].isMine) {
+                    grid[r][c].isMine = true;
+                    minesPlaced++;
+                }
+            }
+
+            // Calculate Neighbors
+            for(let r=0; r<rows; r++) {
+                for(let c=0; c<cols; c++) {
+                    if(!grid[r][c].isMine) {
+                        let count = 0;
+                        for(let dr=-1; dr<=1; dr++) {
+                            for(let dc=-1; dc<=1; dc++) {
+                                let nr=r+dr, nc=c+dc;
+                                if(nr>=0 && nr<rows && nc>=0 && nc<cols && grid[nr][nc].isMine) count++;
+                            }
+                        }
+                        grid[r][c].neighborCount = count;
+                    }
+                }
+            }
+        }
+
+        function reveal(r, c) {
+            if(gameOver || grid[r][c].revealed || grid[r][c].flagged) return;
+
+            let cell = grid[r][c];
+            cell.revealed = true;
+            let div = document.getElementById(`cell-${r}-${c}`);
+            div.classList.add('revealed');
+
+            if(cell.isMine) {
+                div.classList.add('mine');
+                div.innerText = '💣';
+                endGame("SYSTEM FAILURE! MINE TRIGGERED.");
+            } else {
+                if(cell.neighborCount > 0) {
+                    div.innerText = cell.neighborCount;
+                    div.classList.add(`c-${cell.neighborCount}`);
+                } else {
+                    // Flood fill
+                    for(let dr=-1; dr<=1; dr++) {
+                        for(let dc=-1; dc<=1; dc++) {
+                            let nr=r+dr, nc=c+dc;
+                            if(nr>=0 && nr<rows && nc>=0 && nc<cols) reveal(nr, nc);
+                        }
+                    }
+                }
+                checkWin();
+            }
+        }
+
+        function flag(r, c) {
+            if(gameOver || grid[r][c].revealed) return;
+            let cell = grid[r][c];
+            let div = document.getElementById(`cell-${r}-${c}`);
+            
+            if(cell.flagged) {
+                cell.flagged = false;
+                div.classList.remove('flag');
+                div.innerText = '';
+                mineCount++;
+            } else {
+                cell.flagged = true;
+                div.classList.add('flag');
+                div.innerText = '⚑';
+                mineCount--;
+            }
+            document.getElementById('mine-count').innerText = mineCount;
+        }
+
+        function checkWin() {
+            let hiddenSafe = 0;
+            for(let r=0; r<rows; r++) 
+                for(let c=0; c<cols; c++) 
+                    if(!grid[r][c].isMine && !grid[r][c].revealed) hiddenSafe++;
+            
+            if(hiddenSafe === 0) endGame("SECTOR CLEARED! YOU WIN.");
+        }
+
+        function endGame(msg) {
+            gameOver = true;
+            let col = msg.includes("WIN") ? "#00ff00" : "#ff0000";
+            let ico = msg.includes("WIN") ? "success" : "error";
+            Swal.fire({
+                title: msg,
+                background: '#0a0a0a', color: col, icon: ico,
+                confirmButtonText: 'RESTART',
+                customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title' }
+            }).then(() => initGame());
+        }
+
+        function showGuide() {
+            Swal.fire({
+                title: 'MISSION BRIEF',
+                html: `
+                    <ul style="list-style: none; padding: 0; text-align: left;">
+                        <li style="margin-bottom: 10px;">► <strong>GOAL:</strong> Flag all mines (15 total) and reveal all safe zones.</li>
+                        <li style="margin-bottom: 10px;">► <strong>CONTROLS:</strong>
+                            <br>• <strong>Left Click:</strong> REVEAL a square.
+                            <br>• <strong>Right Click:</strong> FLAG a mine.
+                        </li>
+                        <li style="margin-bottom: 10px;">► <strong>THE NUMBERS:</strong> A number tells you exactly how many mines are touching that square.
+                            <br><em>Example:</em> A '1' means there is exactly 1 mine next to it.
+                        </li>
+                        <li style="margin-bottom: 10px;">► <strong>AI ASSIST:</strong> Click "AI SCAN" to let the computer deduce safe moves using math.</li>
+                    </ul>
+                `,
+                background: '#0a0a0a', color: '#ff00cc',
+                confirmButtonText: 'ACKNOWLEDGED',
+                confirmButtonColor: '#ff00cc',
+                customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title', content: 'swal-custom-content' }
+            });
+        }
+
+        // --- AI LOGIC ---
+        function runAI() {
+            if(gameOver) return;
+            
+            // Build simple grid representation for Python
+            // -1: Hidden, -2: Flagged, 0-8: Number
+            let simpleGrid = [];
+            for(let r=0; r<rows; r++) {
+                let row = [];
+                for(let c=0; c<cols; c++) {
+                    let cell = grid[r][c];
+                    if(cell.flagged) row.push(-2);
+                    else if(!cell.revealed) row.push(-1);
+                    else row.push(cell.neighborCount);
+                }
+                simpleGrid.push(row);
+            }
+
+            fetch('/solve_mines', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ grid: simpleGrid })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.moves.length === 0) {
+                    Swal.fire({
+                        title: 'NO LOGICAL MOVES',
+                        text: 'The AI cannot deduce a safe move. You must guess.',
+                        background: '#0a0a0a', color: '#ff00cc', icon: 'warning',
+                        customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title' }
+                    });
+                } else {
+                    data.moves.forEach(move => {
+                        if(move.action === 'REVEAL') reveal(move.r, move.c);
+                        if(move.action === 'FLAG' && !grid[move.r][move.c].flagged) flag(move.r, move.c);
+                    });
+                }
+            });
+        }
+
+        initGame();
+    </script>
+</body>
+</html>

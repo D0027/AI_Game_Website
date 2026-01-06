@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEURAL ARENA | Neon Flow</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        /* --- CORE STYLES --- */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: #020202; color: #fff; font-family: 'Rajdhani', sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+            min-height: 100vh; overflow-y: auto; padding-top: 20px; padding-bottom: 50px;
+            user-select: none;
+        }
+        #neural-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; background: radial-gradient(circle at center, #1a0011 0%, #000 100%); }
+        .scanlines { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2)); background-size: 100% 4px; pointer-events: none; z-index: -1; opacity: 0.3; }
+
+        .back-btn { position: absolute; top: 30px; left: 30px; text-decoration: none; color: #ff0099; font-family: 'Orbitron'; font-size: 1rem; border: 1px solid #ff0099; padding: 10px 20px; border-radius: 5px; transition: 0.3s; background: rgba(255, 0, 153, 0.1); }
+        .back-btn:hover { background-color: #ff0099; color: #fff; box-shadow: 0 0 25px #ff0099; }
+
+        h1 { font-family: 'Orbitron'; font-size: 3.5rem; text-shadow: 0 0 20px #ff0099; color: #ff0099; margin-bottom: 30px; margin-top: 40px; }
+
+        /* STATUS BAR */
+        .status-bar { 
+            margin-bottom: 15px; font-family: 'Orbitron'; font-size: 1.2rem; color: #ff0099; 
+            display: flex; gap: 30px; width: 800px; justify-content: space-between;
+        }
+        .status-val { color: #fff; text-shadow: 0 0 10px #ff0099; }
+
+        /* GAME CANVAS */
+        #flowCanvas {
+            background: rgba(20, 0, 10, 0.9);
+            border: 2px solid #ff0099;
+            box-shadow: 0 0 40px rgba(255, 0, 153, 0.2);
+            border-radius: 5px;
+            cursor: pointer; /* Indicates clickable */
+        }
+
+        .controls-area { margin-top: 30px; display: flex; gap: 20px; }
+        button {
+            padding: 10px 30px; font-family: 'Orbitron'; font-size: 1rem; color: #fff; background: #ff0099;
+            border: none; cursor: pointer; border-radius: 5px; box-shadow: 0 0 20px #ff0099; transition: 0.3s;
+        }
+        button:hover { transform: scale(1.1); box-shadow: 0 0 40px #ff0099; }
+        
+        .btn-guide { background: transparent; border: 2px solid #ff0099; color: #ff0099; }
+        .btn-guide:hover { background: #ff0099; color: #fff; }
+
+        .swal-custom-popup { background: #0a0a0a !important; border: 2px solid #ff0099 !important; }
+        .swal-custom-title { color: #ff0099 !important; font-family: 'Orbitron' !important; }
+        .swal-custom-content { color: #ccc !important; font-family: 'Rajdhani' !important; font-size: 1.1rem; text-align: left;}
+    </style>
+</head>
+<body>
+    <canvas id="neural-bg"></canvas>
+    <div class="scanlines"></div>
+
+    <a href="/" class="back-btn">← DASHBOARD</a>
+    <h1>NEON FLOW</h1>
+
+    <div class="status-bar">
+        <div>TOTAL FLOW: <span id="total-flow" class="status-val">0</span></div>
+        <div>PATH: <span id="current-path" class="status-val">SELECT SRC</span></div>
+    </div>
+
+    <canvas id="flowCanvas" width="800" height="500"></canvas>
+
+    <div class="controls-area">
+        <button class="btn-guide" onclick="showGuide()">MISSION BRIEF</button>
+        <button onclick="initGraph()">RESET NETWORK</button>
+        <button onclick="runAI()">AI AUTO-COMPLETE</button>
+    </div>
+
+    <script>
+        const bgCanvas = document.getElementById('neural-bg'); const bgCtx = bgCanvas.getContext('2d');
+        bgCanvas.width = window.innerWidth; bgCanvas.height = window.innerHeight;
+        let particles=[]; class Particle{constructor(){this.x=Math.random()*bgCanvas.width;this.y=Math.random()*bgCanvas.height;this.size=Math.random()*2;this.speedX=(Math.random()*1.0)-0.5;this.speedY=(Math.random()*1.0)-0.5;this.color='#ff0099';}update(){this.x+=this.speedX;this.y+=this.speedY;if(this.x<0||this.x>bgCanvas.width)this.speedX*=-1;if(this.y<0||this.y>bgCanvas.height)this.speedY*=-1;}draw(){bgCtx.fillStyle=this.color;bgCtx.beginPath();bgCtx.arc(this.x,this.y,this.size,0,Math.PI*2);bgCtx.fill();}}
+        function initBg(){particles=[];for(let i=0;i<60;i++)particles.push(new Particle());}
+        function animateBg(){bgCtx.clearRect(0,0,bgCanvas.width,bgCanvas.height);for(let i=0;i<particles.length;i++){particles[i].update();particles[i].draw();connect(i);}requestAnimationFrame(animateBg);}
+        function connect(a){for(let b=a;b<particles.length;b++){let dist=((particles[a].x-particles[b].x)**2+(particles[a].y-particles[b].y)**2);if(dist<(bgCanvas.width/7)*(bgCanvas.height/7)){bgCtx.strokeStyle='rgba(255, 0, 153,'+(1-dist/25000)+')';bgCtx.lineWidth=1;bgCtx.beginPath();bgCtx.moveTo(particles[a].x,particles[a].y);bgCtx.lineTo(particles[b].x,particles[b].y);bgCtx.stroke();}}}
+        window.addEventListener('resize',()=>{bgCanvas.width=window.innerWidth;bgCanvas.height=window.innerHeight;initBg();});initBg(); animateBg();
+    </script>
+
+    <script>
+        const canvas = document.getElementById('flowCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        let nodes = [];
+        let edges = [];
+        let manualPath = [];
+        let totalFlow = 0;
+        let isDragging = false;
+        let dragNode = null;
+        let isProcessing = false;
+
+        // --- INITIALIZATION ---
+        function initGraph() {
+            nodes = [];
+            edges = [];
+            manualPath = [];
+            totalFlow = 0;
+            isProcessing = false;
+            document.getElementById('total-flow').innerText = "0";
+            document.getElementById('current-path').innerText = "SELECT SRC";
+            
+            // Layout Nodes
+            nodes.push({id: 0, x: 100, y: 250, label: "SRC", layer: 0}); // Source
+            nodes.push({id: 7, x: 700, y: 250, label: "SNK", layer: 3}); // Sink
+            
+            // Middle Nodes (Random positions)
+            for(let i=1; i<=6; i++) {
+                nodes.push({
+                    id: i,
+                    x: Math.random() * 400 + 200, 
+                    y: Math.random() * 400 + 50,
+                    label: "N"+i, 
+                    layer: (i <= 3) ? 1 : 2
+                });
+            }
+            
+            // Create Edges
+            // SRC -> Layer 1
+            for(let i=1; i<=3; i++) edges.push(createEdge(0, i));
+            // Layer 1 -> Layer 2
+            for(let i=1; i<=3; i++) {
+                for(let j=4; j<=6; j++) {
+                    if(Math.random() > 0.4) edges.push(createEdge(i, j));
+                }
+            }
+            // Layer 2 -> SNK
+            for(let i=4; i<=6; i++) edges.push(createEdge(i, 7));
+            
+            draw();
+        }
+
+        function createEdge(u, v) {
+            return {
+                source: u, target: v,
+                capacity: Math.floor(Math.random() * 20) + 5,
+                flow: 0
+            };
+        }
+
+        // --- RENDERING ---
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw Edges
+            edges.forEach(e => {
+                let p1 = nodes.find(n => n.id === e.source);
+                let p2 = nodes.find(n => n.id === e.target);
+                
+                // Color logic
+                let isFull = e.flow >= e.capacity;
+                let strokeColor = isFull ? "#550033" : "#444"; // Dark if full
+                
+                // Highlight Manual Path Edges
+                let inManualPath = false;
+                for(let i=0; i<manualPath.length-1; i++) {
+                    if(manualPath[i] === e.source && manualPath[i+1] === e.target) inManualPath = true;
+                }
+                if(inManualPath) strokeColor = "#fff";
+
+                // Base line
+                ctx.beginPath();
+                ctx.lineWidth = 4;
+                ctx.strokeStyle = strokeColor;
+                ctx.moveTo(p1.x, p1.y);
+                ctx.lineTo(p2.x, p2.y);
+                ctx.stroke();
+                
+                // Flow Overlay (Cyan/Pink)
+                if(e.flow > 0) {
+                    ctx.beginPath();
+                    ctx.lineWidth = 2;
+                    let flowColor = isFull ? "#ff0099" : "#00ffff"; // Pink = Maxed, Cyan = Flowing
+                    ctx.strokeStyle = flowColor;
+                    ctx.shadowBlur = 10; ctx.shadowColor = flowColor;
+                    ctx.moveTo(p1.x, p1.y);
+                    ctx.lineTo(p2.x, p2.y);
+                    ctx.stroke();
+                    ctx.shadowBlur = 0;
+                }
+
+                // Capacity Text
+                let midX = (p1.x + p2.x)/2;
+                let midY = (p1.y + p2.y)/2;
+                ctx.fillStyle = "rgba(0,0,0,0.8)";
+                ctx.fillRect(midX-15, midY-8, 30, 16);
+                ctx.fillStyle = isFull ? "#ff0099" : "#fff";
+                ctx.font = "12px monospace";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText(`${e.flow}/${e.capacity}`, midX, midY);
+            });
+
+            // Draw Nodes
+            nodes.forEach(n => {
+                ctx.beginPath();
+                ctx.arc(n.x, n.y, 20, 0, Math.PI*2);
+                
+                // Highlight Selection
+                let isActive = manualPath.includes(n.id);
+                ctx.fillStyle = isActive ? "#fff" : ((n.id === 0 || n.id === 7) ? "#ff0099" : "#220011");
+                ctx.fill();
+                
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = isActive ? "#fff" : "#ff0099";
+                if(isActive) { ctx.shadowBlur = 15; ctx.shadowColor = "#fff"; }
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+                
+                ctx.fillStyle = isActive ? "#000" : "#fff";
+                ctx.font = "bold 12px Orbitron";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText(n.label, n.x, n.y);
+            });
+        }
+
+        // --- INTERACTIVITY (DRAG & MANUAL PLAY) ---
+        function getMousePos(e) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            return { x: clientX - rect.left, y: clientY - rect.top };
+        }
+
+        canvas.addEventListener('mousedown', startInteract);
+        canvas.addEventListener('touchstart', startInteract, {passive: false});
+
+        function startInteract(e) {
+            e.preventDefault(); // Prevent scrolling on touch
+            if(isProcessing) return; // Lock if AI running
+
+            const pos = getMousePos(e);
+            
+            // Check Node Hit
+            let hitNode = nodes.find(n => Math.hypot(n.x - pos.x, n.y - pos.y) < 25);
+            
+            if(hitNode) {
+                // If holding mouse down, assume dragging intent immediately? 
+                // Or checking click. Let's start dragging logic.
+                isDragging = true;
+                dragNode = hitNode;
+                
+                // Logic: Is this a click to route?
+                handleNodeClick(hitNode.id);
+            }
+        }
+
+        canvas.addEventListener('mousemove', dragInteract);
+        canvas.addEventListener('touchmove', dragInteract, {passive: false});
+
+        function dragInteract(e) {
+            if(isDragging && dragNode) {
+                e.preventDefault();
+                const pos = getMousePos(e);
+                dragNode.x = pos.x;
+                dragNode.y = pos.y;
+                draw();
+            }
+        }
+
+        window.addEventListener('mouseup', () => { isDragging = false; dragNode = null; });
+        window.addEventListener('touchend', () => { isDragging = false; dragNode = null; });
+
+        function handleNodeClick(id) {
+            // Manual Path Logic
+            if(manualPath.length === 0) {
+                if(id === 0) { // Must start at SRC
+                    manualPath.push(id);
+                    updatePathUI();
+                } else {
+                    Swal.fire({ toast: true, position: 'top-end', title: 'Start at SRC', icon: 'info', timer: 1000, showConfirmButton: false, background: '#000', color: '#fff'});
+                }
+            } else {
+                let lastNode = manualPath[manualPath.length - 1];
+                
+                // Undo if clicking last node
+                if(id === lastNode && manualPath.length > 1) {
+                    manualPath.pop();
+                    updatePathUI();
+                    draw();
+                    return;
+                }
+                
+                if(manualPath.includes(id)) return; // No loops
+
+                // Check connection
+                let edge = edges.find(e => e.source === lastNode && e.target === id);
+                if(edge) {
+                    if(edge.capacity - edge.flow > 0) {
+                        manualPath.push(id);
+                        updatePathUI();
+                        
+                        // If SNK reached, push flow
+                        if(id === 7) {
+                            pushManualFlow();
+                        }
+                    } else {
+                        Swal.fire({ toast: true, position: 'top-end', title: 'Pipe Full!', icon: 'error', timer: 1000, showConfirmButton: false, background: '#000', color: '#ff0099'});
+                    }
+                }
+            }
+            draw();
+        }
+
+        function updatePathUI() {
+            let labels = manualPath.map(id => nodes.find(n => n.id === id).label);
+            document.getElementById('current-path').innerText = labels.join(" → ");
+        }
+
+        function pushManualFlow() {
+            // Calculate Bottleneck
+            let bottleneck = Infinity;
+            let pathEdges = [];
+            
+            for(let i=0; i<manualPath.length-1; i++) {
+                let u = manualPath[i];
+                let v = manualPath[i+1];
+                let edge = edges.find(e => e.source === u && e.target === v);
+                let remaining = edge.capacity - edge.flow;
+                if(remaining < bottleneck) bottleneck = remaining;
+                pathEdges.push(edge);
+            }
+
+            // Update Flow
+            pathEdges.forEach(e => e.flow += bottleneck);
+            totalFlow += bottleneck;
+            document.getElementById('total-flow').innerText = totalFlow;
+            
+            Swal.fire({
+                title: 'FLOW PUSHED',
+                text: `+${bottleneck} units added.`,
+                background: '#0a0a0a', color: '#ff0099', icon: 'success',
+                timer: 1000, showConfirmButton: false
+            });
+
+            // Reset path selection
+            manualPath = [];
+            updatePathUI();
+            draw();
+        }
+
+        // --- AI SOLVER ---
+        function runAI() {
+            if(isProcessing) return;
+            isProcessing = true;
+            
+            // Send current state to backend (simplified: just send structure, AI calculates ideal max flow)
+            // Note: Since we modified flows manually, let's reset flows for the AI demonstration OR
+            // keep current flow. For "Auto-Complete", we should just continue filling.
+            
+            // To keep it simple and robust, we reset flow visually and let AI animate FULL solution
+            edges.forEach(e => e.flow = 0);
+            totalFlow = 0;
+            document.getElementById('total-flow').innerText = 0;
+            
+            fetch('/solve_flow', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ nodes: nodes, edges: edges })
+            })
+            .then(res => res.json())
+            .then(data => {
+                animateFlow(data.steps, data.max_flow);
+            });
+        }
+
+        function animateFlow(steps, maxTotal) {
+            let i = 0;
+            function nextStep() {
+                if(i >= steps.length) {
+                    isProcessing = false;
+                    // ** CLEAR SUCCESS MESSAGE **
+                    Swal.fire({
+                        title: "SYSTEM SATURATED",
+                        text: `Maximum Network Capacity: ${maxTotal} units.`,
+                        background: '#0a0a0a', color: '#ff0099', icon: 'success',
+                        confirmButtonText: 'RESET', confirmButtonColor: '#ff0099'
+                    });
+                    return;
+                }
+                
+                let step = steps[i];
+                let path = step.path;
+                let flowAmt = step.flow;
+                
+                totalFlow += flowAmt;
+                document.getElementById('total-flow').innerText = totalFlow;
+
+                for(let k=0; k<path.length-1; k++) {
+                    let u = path[k];
+                    let v = path[k+1];
+                    let edge = edges.find(e => e.source === u && e.target === v);
+                    if(edge) edge.flow += flowAmt;
+                }
+                draw();
+                i++;
+                setTimeout(nextStep, 300); // Speed
+            }
+            nextStep();
+        }
+
+        function showGuide() {
+            Swal.fire({
+                title: 'MISSION BRIEF',
+                html: `
+                    <ul style="list-style: none; padding: 0; text-align: left;">
+                        <li style="margin-bottom: 10px;">► <strong>MANUAL MODE:</strong> Click nodes (SRC -> N1 -> ...) to build a path. Click SNK to push data.</li>
+                        <li style="margin-bottom: 10px;">► <strong>DRAG:</strong> Click and hold any node to rearrange the graph layout.</li>
+                        <li style="margin-bottom: 10px;">► <strong>GOAL:</strong> Saturate the pipes until no more data fits.</li>
+                    </ul>
+                `,
+                background: '#0a0a0a', color: '#ff0099',
+                confirmButtonText: 'ACKNOWLEDGED',
+                confirmButtonColor: '#ff0099',
+                customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title', content: 'swal-custom-content' }
+            });
+        }
+
+        initGraph();
+    </script>
+</body>
+</html>

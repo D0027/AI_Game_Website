@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEURAL ARENA | Neon Snake</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        /* --- CORE STYLES --- */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: #020202; color: #fff; font-family: 'Rajdhani', sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+            min-height: 100vh; overflow-y: auto; padding-top: 20px; padding-bottom: 50px;
+        }
+        #neural-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; background: radial-gradient(circle at center, #051a05 0%, #000 100%); }
+        .scanlines { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2)); background-size: 100% 4px; pointer-events: none; z-index: -1; opacity: 0.3; }
+
+        .back-btn { position: absolute; top: 30px; left: 30px; text-decoration: none; color: #39ff14; font-family: 'Orbitron'; font-size: 1rem; border: 1px solid #39ff14; padding: 10px 20px; border-radius: 5px; transition: 0.3s; background: rgba(57, 255, 20, 0.1); }
+        .back-btn:hover { background-color: #39ff14; color: #000; box-shadow: 0 0 25px #39ff14; }
+
+        h1 { font-family: 'Orbitron'; font-size: 3.5rem; text-shadow: 0 0 20px #39ff14; color: #39ff14; margin-bottom: 10px; margin-top: 40px; }
+        
+        .score-board { font-family: 'Orbitron'; font-size: 2rem; margin-bottom: 15px; color: #fff; text-shadow: 0 0 10px #39ff14; }
+        
+        #game-container {
+            position: relative;
+            padding: 5px;
+            background: rgba(0, 20, 0, 0.5);
+            border: 2px solid #39ff14;
+            box-shadow: 0 0 40px rgba(57, 255, 20, 0.2);
+            border-radius: 5px;
+        }
+
+        canvas { background: rgba(0, 0, 0, 0.8); display: block; }
+
+        .controls-area { margin-top: 20px; display: flex; gap: 20px; align-items: center; }
+        
+        .btn-ai {
+            padding: 10px 30px; font-family: 'Orbitron'; font-size: 1rem; color: #000; background: #39ff14;
+            border: none; cursor: pointer; border-radius: 5px; box-shadow: 0 0 20px #39ff14; transition: 0.3s;
+        }
+        .btn-ai:hover { transform: scale(1.1); box-shadow: 0 0 40px #39ff14; }
+        .btn-ai.active { background: #ff0055; color: #fff; box-shadow: 0 0 20px #ff0055; }
+
+        .instructions { margin-top: 15px; color: #888; font-family: 'Orbitron'; letter-spacing: 1px; font-size: 0.9rem; }
+
+        .swal-custom-popup { background: #0a0a0a !important; border: 2px solid #39ff14 !important; }
+        .swal-custom-title { color: #39ff14 !important; font-family: 'Orbitron' !important; }
+    </style>
+</head>
+<body>
+    <canvas id="neural-bg"></canvas>
+    <div class="scanlines"></div>
+
+    <a href="/" class="back-btn">← DASHBOARD</a>
+    <h1>NEON SERPENT</h1>
+    
+    <div class="score-board">DATA UNITS: <span id="score">0</span></div>
+
+    <div id="game-container">
+        <canvas id="gameCanvas" width="500" height="500"></canvas>
+    </div>
+
+    <div class="controls-area">
+        <button class="btn-ai" id="aiBtn" onclick="toggleAI()">ACTIVATE AUTOPILOT</button>
+    </div>
+    <div class="instructions">Use ARROW KEYS to move. Press SPACE to Pause.</div>
+
+    <script>
+        const bgCanvas = document.getElementById('neural-bg'); const bgCtx = bgCanvas.getContext('2d');
+        bgCanvas.width = window.innerWidth; bgCanvas.height = window.innerHeight;
+        let bgParticles; class Particle { constructor() { this.x = Math.random()*bgCanvas.width; this.y = Math.random()*bgCanvas.height; this.size = Math.random()*2; this.speedX = (Math.random()*1.5)-0.75; this.speedY = (Math.random()*1.5)-0.75; this.color = '#39ff14'; } update() { this.x+=this.speedX; this.y+=this.speedY; if(this.x<0||this.x>bgCanvas.width)this.speedX*=-1; if(this.y<0||this.y>bgCanvas.height)this.speedY*=-1; } draw() { bgCtx.fillStyle=this.color; bgCtx.beginPath(); bgCtx.arc(this.x, this.y, this.size, 0, Math.PI*2); bgCtx.fill(); } }
+        function initBg() { bgParticles=[]; for(let i=0; i<80; i++) bgParticles.push(new Particle()); }
+        function animateBg() { bgCtx.clearRect(0,0,bgCanvas.width,bgCanvas.height); for(let i=0; i<bgParticles.length; i++){ bgParticles[i].update(); bgParticles[i].draw(); connect(i); } requestAnimationFrame(animateBg); }
+        function connect(a) { for(let b=a; b<bgParticles.length; b++){ let dist = ((bgParticles[a].x-bgParticles[b].x)**2 + (bgParticles[a].y-bgParticles[b].y)**2); if(dist<(bgCanvas.width/7)*(bgCanvas.height/7)){ bgCtx.strokeStyle='rgba(57, 255, 20,'+(1-dist/20000)+')'; bgCtx.lineWidth=1; bgCtx.beginPath(); bgCtx.moveTo(bgParticles[a].x, bgParticles[a].y); bgCtx.lineTo(bgParticles[b].x, bgParticles[b].y); bgCtx.stroke(); }}}
+        window.addEventListener('resize', ()=>{ bgCanvas.width=window.innerWidth; bgCanvas.height=window.innerHeight; initBg(); }); initBg(); animateBg();
+    </script>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const gridSize = 20; // 20x20 grid
+        const tileCount = canvas.width / gridSize; // 25 tiles
+
+        let snake = [{x: 10, y: 10}];
+        let food = {x: 15, y: 15};
+        let dx = 0;
+        let dy = 0;
+        let score = 0;
+        let gameSpeed = 100;
+        let gameLoop;
+        let isAI = false;
+        let aiProcessing = false;
+
+        function drawRect(x, y, color) {
+            ctx.fillStyle = color;
+            ctx.shadowBlur = 10; ctx.shadowColor = color;
+            ctx.fillRect(x * gridSize, y * gridSize, gridSize - 2, gridSize - 2);
+            ctx.shadowBlur = 0;
+        }
+
+        function drawGame() {
+            // Move Snake
+            const head = {x: snake[0].x + dx, y: snake[0].y + dy};
+            
+            // Wall Collision
+            if (head.x < 0 || head.x >= tileCount || head.y < 0 || head.y >= tileCount) {
+                gameOver(); return;
+            }
+            // Self Collision (ignore if not moving yet)
+            if ((dx !== 0 || dy !== 0) && snake.some(s => s.x === head.x && s.y === head.y)) {
+                gameOver(); return;
+            }
+
+            snake.unshift(head);
+
+            // Eat Food
+            if (head.x === food.x && head.y === food.y) {
+                score++;
+                document.getElementById('score').innerText = score;
+                placeFood();
+            } else {
+                snake.pop(); // Remove tail if not eating
+            }
+
+            // Draw Everything
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Food
+            drawRect(food.x, food.y, '#ff0055');
+
+            // Draw Snake
+            snake.forEach((part, index) => {
+                let color = index === 0 ? '#fff' : '#39ff14'; // Head is white
+                drawRect(part.x, part.y, color);
+            });
+
+            // AI Logic
+            if (isAI && !aiProcessing) {
+                getAIMove();
+            }
+        }
+
+        function placeFood() {
+            food = {
+                x: Math.floor(Math.random() * tileCount),
+                y: Math.floor(Math.random() * tileCount)
+            };
+            // Don't place food on snake
+            if (snake.some(s => s.x === food.x && s.y === food.y)) placeFood();
+        }
+
+        function gameOver() {
+            clearInterval(gameLoop);
+            Swal.fire({
+                title: 'SYSTEM FAILURE',
+                text: 'Neural Link Severed. Score: ' + score,
+                background: '#0a0a0a', color: '#39ff14', icon: 'error',
+                confirmButtonText: 'REBOOT',
+                customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title' }
+            }).then(() => location.reload());
+        }
+
+        // --- CONTROLS ---
+        document.addEventListener('keydown', (e) => {
+            if (isAI) return; // Disable keys if AI is on
+            if(e.key === 'ArrowLeft' && dx !== 1) { dx = -1; dy = 0; }
+            if(e.key === 'ArrowUp' && dy !== 1) { dx = 0; dy = -1; }
+            if(e.key === 'ArrowRight' && dx !== -1) { dx = 1; dy = 0; }
+            if(e.key === 'ArrowDown' && dy !== -1) { dx = 0; dy = 1; }
+        });
+
+        // --- AI LOGIC ---
+        function toggleAI() {
+            isAI = !isAI;
+            const btn = document.getElementById('aiBtn');
+            if (isAI) {
+                btn.innerText = "DEACTIVATE AUTOPILOT";
+                btn.classList.add('active');
+            } else {
+                btn.innerText = "ACTIVATE AUTOPILOT";
+                btn.classList.remove('active');
+            }
+        }
+
+        function getAIMove() {
+            aiProcessing = true;
+            // Convert snake array to array of arrays for Python
+            let snakeArr = snake.map(p => [p.x, p.y]);
+            let foodArr = [food.x, food.y];
+
+            fetch('/move_snake_ai', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    gridSize: tileCount,
+                    snake: snakeArr,
+                    food: foodArr
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.direction === 'LEFT' && dx !== 1) { dx = -1; dy = 0; }
+                if (data.direction === 'UP' && dy !== 1) { dx = 0; dy = -1; }
+                if (data.direction === 'RIGHT' && dx !== -1) { dx = 1; dy = 0; }
+                if (data.direction === 'DOWN' && dy !== -1) { dx = 0; dy = 1; }
+                aiProcessing = false;
+            })
+            .catch(err => aiProcessing = false);
+        }
+
+        // Start Game
+        gameLoop = setInterval(drawGame, 100);
+    </script>
+</body>
+</html>

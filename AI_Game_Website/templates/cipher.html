@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEURAL ARENA | Neon Cipher</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        /* --- CORE STYLES --- */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: #020202; color: #fff; font-family: 'Rajdhani', sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+            min-height: 100vh; overflow-y: auto; padding-top: 20px; padding-bottom: 50px;
+            user-select: none;
+        }
+        #neural-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; background: radial-gradient(circle at center, #001a00 0%, #000 100%); }
+        .scanlines { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2)); background-size: 100% 4px; pointer-events: none; z-index: -1; opacity: 0.3; }
+
+        .back-btn { position: absolute; top: 30px; left: 30px; text-decoration: none; color: #00ff00; font-family: 'Orbitron'; font-size: 1rem; border: 1px solid #00ff00; padding: 10px 20px; border-radius: 5px; transition: 0.3s; background: rgba(0, 255, 0, 0.1); }
+        .back-btn:hover { background-color: #00ff00; color: #000; box-shadow: 0 0 25px #00ff00; }
+
+        h1 { font-family: 'Orbitron'; font-size: 3.5rem; text-shadow: 0 0 20px #00ff00; color: #00ff00; margin-bottom: 30px; margin-top: 40px; }
+
+        /* GAME BOARD */
+        .board-container {
+            display: flex; gap: 40px; align-items: flex-start;
+        }
+
+        #game-grid {
+            display: flex; flex-direction: column-reverse; gap: 10px;
+            background: rgba(0, 20, 0, 0.8);
+            padding: 20px; border: 2px solid #00ff00;
+            border-radius: 10px; box-shadow: 0 0 30px rgba(0, 255, 0, 0.1);
+        }
+
+        .row { display: flex; gap: 15px; align-items: center; opacity: 0.5; pointer-events: none; transition: 0.3s; }
+        .row.active { opacity: 1; pointer-events: all; border-bottom: 1px solid #004400; padding-bottom: 5px; }
+
+        .hole {
+            width: 40px; height: 40px; border-radius: 50%;
+            background: #111; border: 2px solid #333;
+            cursor: pointer; transition: 0.2s;
+        }
+        .hole:hover { border-color: #fff; transform: scale(1.1); }
+
+        .feedback-slots {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 4px;
+            width: 30px; margin-left: 10px;
+        }
+        .peg { width: 10px; height: 10px; border-radius: 50%; background: #222; }
+        .peg.black { background: #00ff00; box-shadow: 0 0 5px #00ff00; }
+        .peg.white { background: #fff; box-shadow: 0 0 5px #fff; }
+
+        /* CONTROLS */
+        .panel { display: flex; flex-direction: column; gap: 20px; }
+        
+        .color-picker {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+            padding: 15px; background: #111; border: 1px solid #00ff00; border-radius: 10px;
+        }
+        .color-btn {
+            width: 50px; height: 50px; border-radius: 50%;
+            border: 2px solid transparent; cursor: pointer; transition: 0.2s;
+        }
+        .color-btn:hover { transform: scale(1.1); box-shadow: 0 0 15px #fff; }
+        .color-btn.selected { border-color: #fff; box-shadow: 0 0 20px #fff; }
+
+        /* COLORS */
+        .c0 { background: #ff0000; box-shadow: 0 0 10px #ff0000; }
+        .c1 { background: #00ff00; box-shadow: 0 0 10px #00ff00; }
+        .c2 { background: #0000ff; box-shadow: 0 0 10px #0000ff; }
+        .c3 { background: #ffff00; box-shadow: 0 0 10px #ffff00; }
+        .c4 { background: #ff00ff; box-shadow: 0 0 10px #ff00ff; }
+        .c5 { background: #00ffff; box-shadow: 0 0 10px #00ffff; }
+
+        button {
+            padding: 10px 30px; font-family: 'Orbitron'; font-size: 1rem; color: #000; background: #00ff00;
+            border: none; cursor: pointer; border-radius: 5px; box-shadow: 0 0 20px #00ff00; transition: 0.3s;
+        }
+        button:hover { transform: scale(1.1); box-shadow: 0 0 40px #00ff00; }
+        .btn-guide { background: transparent; border: 2px solid #00ff00; color: #00ff00; }
+        .btn-guide:hover { background: #00ff00; color: #000; }
+
+        .swal-custom-popup { background: #0a0a0a !important; border: 2px solid #00ff00 !important; }
+        .swal-custom-title { color: #00ff00 !important; font-family: 'Orbitron' !important; }
+        .swal-custom-content { color: #ccc !important; font-family: 'Rajdhani' !important; font-size: 1.1rem; text-align: left;}
+    </style>
+</head>
+<body>
+    <canvas id="neural-bg"></canvas>
+    <div class="scanlines"></div>
+
+    <a href="/" class="back-btn">← DASHBOARD</a>
+    <h1>NEON CIPHER</h1>
+
+    <div class="board-container">
+        <div id="game-grid"></div>
+
+        <div class="panel">
+            <div class="color-picker">
+                <div class="color-btn c0" onclick="selectColor(0)"></div>
+                <div class="color-btn c1" onclick="selectColor(1)"></div>
+                <div class="color-btn c2" onclick="selectColor(2)"></div>
+                <div class="color-btn c3" onclick="selectColor(3)"></div>
+                <div class="color-btn c4" onclick="selectColor(4)"></div>
+                <div class="color-btn c5" onclick="selectColor(5)"></div>
+            </div>
+            <button onclick="submitRow()">SUBMIT ROW</button>
+            <button class="btn-guide" onclick="showGuide()">MISSION BRIEF</button>
+            <button class="btn-guide" onclick="runAI()">AI DECRYPT</button>
+            <button onclick="location.reload()">RESET SYSTEM</button>
+        </div>
+    </div>
+
+    <script>
+        const bgCanvas = document.getElementById('neural-bg'); const bgCtx = bgCanvas.getContext('2d');
+        bgCanvas.width = window.innerWidth; bgCanvas.height = window.innerHeight;
+        let particles=[]; class Particle{constructor(){this.x=Math.random()*bgCanvas.width;this.y=Math.random()*bgCanvas.height;this.size=Math.random()*2;this.speedX=(Math.random()*1.0)-0.5;this.speedY=(Math.random()*1.0)-0.5;this.color='#00ff00';}update(){this.x+=this.speedX;this.y+=this.speedY;if(this.x<0||this.x>bgCanvas.width)this.speedX*=-1;if(this.y<0||this.y>bgCanvas.height)this.speedY*=-1;}draw(){bgCtx.fillStyle=this.color;bgCtx.beginPath();bgCtx.arc(this.x,this.y,this.size,0,Math.PI*2);bgCtx.fill();}}
+        function initBg(){particles=[];for(let i=0;i<60;i++)particles.push(new Particle());}
+        function animateBg(){bgCtx.clearRect(0,0,bgCanvas.width,bgCanvas.height);for(let i=0;i<particles.length;i++){particles[i].update();particles[i].draw();connect(i);}requestAnimationFrame(animateBg);}
+        function connect(a){for(let b=a;b<particles.length;b++){let dist=((particles[a].x-particles[b].x)**2+(particles[a].y-particles[b].y)**2);if(dist<(bgCanvas.width/7)*(bgCanvas.height/7)){bgCtx.strokeStyle='rgba(0, 255, 0,'+(1-dist/25000)+')';bgCtx.lineWidth=1;bgCtx.beginPath();bgCtx.moveTo(particles[a].x,particles[a].y);bgCtx.lineTo(particles[b].x,particles[b].y);bgCtx.stroke();}}}
+        window.addEventListener('resize',()=>{bgCanvas.width=window.innerWidth;bgCanvas.height=window.innerHeight;initBg();});initBg(); animateBg();
+    </script>
+
+    <script>
+        const ROWS = 10;
+        let secretCode = [];
+        let currentRow = 0;
+        let currentGuess = [-1, -1, -1, -1];
+        let selectedColor = 0;
+        let history = []; // For AI
+
+        function initGame() {
+            // Generate Secret
+            secretCode = [];
+            for(let i=0; i<4; i++) secretCode.push(Math.floor(Math.random() * 6));
+            console.log("Secret (Debug):", secretCode);
+
+            // Build Grid
+            const grid = document.getElementById('game-grid');
+            grid.innerHTML = '';
+            for(let r=0; r<ROWS; r++) {
+                let rowDiv = document.createElement('div');
+                rowDiv.className = 'row';
+                rowDiv.id = `row-${r}`;
+                
+                // 4 Holes
+                for(let c=0; c<4; c++) {
+                    let hole = document.createElement('div');
+                    hole.className = 'hole';
+                    hole.id = `hole-${r}-${c}`;
+                    hole.onclick = () => fillHole(r, c);
+                    rowDiv.appendChild(hole);
+                }
+
+                // Feedback
+                let fbDiv = document.createElement('div');
+                fbDiv.className = 'feedback-slots';
+                for(let p=0; p<4; p++) {
+                    let peg = document.createElement('div');
+                    peg.className = 'peg';
+                    peg.id = `peg-${r}-${p}`;
+                    fbDiv.appendChild(peg);
+                }
+                rowDiv.appendChild(fbDiv);
+                grid.appendChild(rowDiv);
+            }
+            
+            document.getElementById('row-0').classList.add('active');
+            currentRow = 0;
+            currentGuess = [-1, -1, -1, -1];
+            history = [];
+            selectColor(0);
+        }
+
+        function selectColor(c) {
+            selectedColor = c;
+            document.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('selected'));
+            document.querySelectorAll('.color-btn')[c].classList.add('selected');
+        }
+
+        function fillHole(r, c) {
+            if(r !== currentRow) return;
+            currentGuess[c] = selectedColor;
+            let hole = document.getElementById(`hole-${r}-${c}`);
+            hole.className = `hole c${selectedColor}`;
+        }
+
+        function submitRow() {
+            if(currentGuess.includes(-1)) {
+                Swal.fire({ title: 'INCOMPLETE DATA', text: 'Fill all 4 slots.', background: '#0a0a0a', color: '#00ff00', icon: 'error', timer: 1000, showConfirmButton: false, customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title' }});
+                return;
+            }
+
+            let feedback = getFeedback(currentGuess, secretCode);
+            renderFeedback(feedback);
+            
+            // Store for AI
+            history.push({
+                guess: [...currentGuess],
+                feedback: feedback
+            });
+
+            if(feedback.black === 4) {
+                endGame(true);
+            } else if(currentRow === ROWS - 1) {
+                endGame(false);
+            } else {
+                document.getElementById(`row-${currentRow}`).classList.remove('active');
+                currentRow++;
+                document.getElementById(`row-${currentRow}`).classList.add('active');
+                currentGuess = [-1, -1, -1, -1];
+            }
+        }
+
+        function getFeedback(guess, code) {
+            let black = 0, white = 0;
+            let codeCounts = [0,0,0,0,0,0];
+            let guessCounts = [0,0,0,0,0,0];
+
+            for(let i=0; i<4; i++) {
+                if(guess[i] === code[i]) {
+                    black++;
+                } else {
+                    codeCounts[code[i]]++;
+                    guessCounts[guess[i]]++;
+                }
+            }
+            for(let i=0; i<6; i++) {
+                white += Math.min(codeCounts[i], guessCounts[i]);
+            }
+            return {black, white};
+        }
+
+        function renderFeedback(fb) {
+            let pins = [];
+            for(let i=0; i<fb.black; i++) pins.push('black');
+            for(let i=0; i<fb.white; i++) pins.push('white');
+            
+            for(let i=0; i<pins.length; i++) {
+                document.getElementById(`peg-${currentRow}-${i}`).classList.add(pins[i]);
+            }
+        }
+
+        function runAI() {
+            if(currentRow >= ROWS) return;
+
+            fetch('/solve_cipher', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ history: history })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.suggestion) {
+                    currentGuess = data.suggestion;
+                    // Visual fill
+                    for(let i=0; i<4; i++) {
+                        let col = currentGuess[i];
+                        document.getElementById(`hole-${currentRow}-${i}`).className = `hole c${col}`;
+                    }
+                    setTimeout(submitRow, 500);
+                } else {
+                    Swal.fire({ title: 'ERROR', text: 'Data Contradiction', background: '#0a0a0a', color: '#ff0000' });
+                }
+            });
+        }
+
+        function endGame(win) {
+            Swal.fire({
+                title: win ? "CODE CRACKED" : "SYSTEM LOCKED",
+                html: win ? "Mainframe Access Granted." : `The code was: <div style='display:flex; gap:5px; justify-content:center; margin-top:10px;'>${secretCode.map(c => `<div class='hole c${c}' style='width:20px;height:20px;pointer-events:none;'></div>`).join('')}</div>`,
+                icon: win ? "success" : "error",
+                background: '#0a0a0a', color: win ? '#00ff00' : '#ff0055',
+                confirmButtonText: 'REBOOT',
+                customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title' }
+            }).then(initGame);
+        }
+
+        function showGuide() {
+            Swal.fire({
+                title: 'MISSION BRIEF',
+                html: `
+                    <ul style="list-style: none; padding: 0; text-align: left;">
+                        <li style="margin-bottom: 10px;">► <strong>GOAL:</strong> Guess the secret 4-color pattern.</li>
+                        <li style="margin-bottom: 10px;">► <strong>FEEDBACK:</strong> 
+                            <br><span style="color:#00ff00">GREEN DOT</span> = Correct Color, Correct Slot.
+                            <br><span style="color:#fff">WHITE DOT</span> = Correct Color, Wrong Slot.
+                        </li>
+                        <li style="margin-bottom: 10px;">► <strong>AI ASSIST:</strong> The AI analyzes previous feedback to mathematically deduce the next best guess.</li>
+                    </ul>
+                `,
+                background: '#0a0a0a', color: '#00ff00',
+                confirmButtonText: 'ACKNOWLEDGED',
+                confirmButtonColor: '#00ff00',
+                customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title', content: 'swal-custom-content' }
+            });
+        }
+
+        initGame();
+    </script>
+</body>
+</html>

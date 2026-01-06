@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEURAL ARENA | Neon Cortex</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        /* --- CORE STYLES --- */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: #020202; color: #fff; font-family: 'Rajdhani', sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+            min-height: 100vh; overflow-y: auto; padding-top: 20px; padding-bottom: 50px;
+            user-select: none;
+        }
+        #neural-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; background: radial-gradient(circle at center, #1a001a 0%, #000 100%); }
+        .scanlines { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2)); background-size: 100% 4px; pointer-events: none; z-index: -1; opacity: 0.3; }
+
+        .back-btn { position: absolute; top: 30px; left: 30px; text-decoration: none; color: #ff0099; font-family: 'Orbitron'; font-size: 1rem; border: 1px solid #ff0099; padding: 10px 20px; border-radius: 5px; transition: 0.3s; background: rgba(255, 0, 153, 0.1); }
+        .back-btn:hover { background-color: #ff0099; color: #fff; box-shadow: 0 0 25px #ff0099; }
+
+        h1 { font-family: 'Orbitron'; font-size: 3.5rem; text-shadow: 0 0 20px #ff0099; color: #ff0099; margin-bottom: 10px; margin-top: 40px; }
+        
+        .score-bar { font-family: 'Orbitron'; font-size: 1.5rem; margin-bottom: 20px; display: flex; gap: 40px; }
+        .p-score { color: #00ffff; }
+        .ai-score { color: #ff0099; }
+        .active-turn { text-decoration: underline; text-shadow: 0 0 10px; }
+
+        #grid {
+            display: grid;
+            grid-template-columns: repeat(6, 70px);
+            grid-template-rows: repeat(6, 70px);
+            gap: 10px;
+            perspective: 1000px;
+        }
+
+        .card-slot {
+            width: 70px; height: 70px;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.6s;
+            cursor: pointer;
+        }
+        
+        .card-slot.flipped { transform: rotateY(180deg); }
+        .card-slot.matched { opacity: 0.5; pointer-events: none; }
+
+        .face {
+            position: absolute; width: 100%; height: 100%;
+            backface-visibility: hidden;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 2rem; border-radius: 8px;
+            box-shadow: 0 0 15px rgba(255, 0, 153, 0.3);
+        }
+
+        .front {
+            background: #111; border: 2px solid #ff0099;
+            font-family: 'Orbitron'; color: #ff0099;
+        }
+        
+        .back {
+            background: #222; border: 2px solid #fff;
+            transform: rotateY(180deg);
+            color: #fff; text-shadow: 0 0 10px #fff;
+        }
+
+        .controls-area { margin-top: 30px; display: flex; gap: 20px; }
+        button {
+            padding: 10px 30px; font-family: 'Orbitron'; font-size: 1rem; color: #fff; background: #ff0099;
+            border: none; cursor: pointer; border-radius: 5px; box-shadow: 0 0 20px #ff0099; transition: 0.3s;
+        }
+        button:hover { transform: scale(1.1); box-shadow: 0 0 40px #ff0099; }
+        .btn-guide { background: transparent; border: 2px solid #ff0099; color: #ff0099; }
+        .btn-guide:hover { background: #ff0099; color: #fff; }
+
+        .swal-custom-popup { background: #0a0a0a !important; border: 2px solid #ff0099 !important; }
+        .swal-custom-title { color: #ff0099 !important; font-family: 'Orbitron' !important; }
+        .swal-custom-content { color: #ccc !important; font-family: 'Rajdhani' !important; font-size: 1.1rem; text-align: left;}
+    </style>
+</head>
+<body>
+    <canvas id="neural-bg"></canvas>
+    <div class="scanlines"></div>
+
+    <a href="/" class="back-btn">← DASHBOARD</a>
+    <h1>NEON CORTEX</h1>
+
+    <div class="score-bar">
+        <div id="pScore" class="p-score active-turn">PLAYER: 0</div>
+        <div id="aiScore" class="ai-score">AI CORE: 0</div>
+    </div>
+
+    <div id="grid"></div>
+
+    <div class="controls-area">
+        <button class="btn-guide" onclick="showGuide()">MISSION BRIEF</button>
+        <button onclick="initGame()">RESET SYSTEM</button>
+    </div>
+
+    <script>
+        const bgCanvas = document.getElementById('neural-bg'); const bgCtx = bgCanvas.getContext('2d');
+        bgCanvas.width = window.innerWidth; bgCanvas.height = window.innerHeight;
+        let particles=[]; class Particle{constructor(){this.x=Math.random()*bgCanvas.width;this.y=Math.random()*bgCanvas.height;this.size=Math.random()*2;this.speedX=(Math.random()*1.0)-0.5;this.speedY=(Math.random()*1.0)-0.5;this.color='#ff0099';}update(){this.x+=this.speedX;this.y+=this.speedY;if(this.x<0||this.x>bgCanvas.width)this.speedX*=-1;if(this.y<0||this.y>bgCanvas.height)this.speedY*=-1;}draw(){bgCtx.fillStyle=this.color;bgCtx.beginPath();bgCtx.arc(this.x,this.y,this.size,0,Math.PI*2);bgCtx.fill();}}
+        function init(){particles=[];for(let i=0;i<60;i++)particles.push(new Particle());}
+        function animate(){bgCtx.clearRect(0,0,bgCanvas.width,bgCanvas.height);for(let i=0;i<particles.length;i++){particles[i].update();particles[i].draw();connect(i);}requestAnimationFrame(animate);}
+        function connect(a){for(let b=a;b<particles.length;b++){let dist=((particles[a].x-particles[b].x)**2+(particles[a].y-particles[b].y)**2);if(dist<(bgCanvas.width/7)*(bgCanvas.height/7)){bgCtx.strokeStyle='rgba(255, 0, 153,'+(1-dist/25000)+')';bgCtx.lineWidth=1;bgCtx.beginPath();bgCtx.moveTo(particles[a].x,particles[a].y);bgCtx.lineTo(particles[b].x,particles[b].y);bgCtx.stroke();}}}
+        window.addEventListener('resize',()=>{bgCanvas.width=window.innerWidth;bgCanvas.height=window.innerHeight;init();});init();animate();
+    </script>
+
+    <script>
+        const ICONS = ['🤖', '👾', '👽', '👻', '💀', '🧠', '👁️', '⚡', '💻', '📀', '🔋', '📡', '🚀', '🪐', '🧬', '🦠', '💊', '💣'];
+        let board = [];
+        let revealed = []; // Tracks current two cards
+        let matched = [];  // Tracks matched indices
+        let aiMemory = {}; // Local mimic of AI memory for display/logic
+        let turn = 'player'; // 'player' or 'ai'
+        let scores = { player: 0, ai: 0 };
+        let isProcessing = false;
+
+        function initGame() {
+            const grid = document.getElementById('grid');
+            grid.innerHTML = '';
+            board = [...ICONS, ...ICONS];
+            board.sort(() => Math.random() - 0.5);
+            
+            matched = [];
+            revealed = [];
+            aiMemory = {};
+            scores = { player: 0, ai: 0 };
+            updateScores();
+            turn = 'player';
+            isProcessing = false;
+
+            board.forEach((icon, i) => {
+                let slot = document.createElement('div');
+                slot.className = 'card-slot';
+                slot.id = `card-${i}`;
+                slot.onclick = () => cardClick(i);
+                
+                let front = document.createElement('div');
+                front.className = 'face front';
+                front.innerHTML = '?';
+                
+                let back = document.createElement('div');
+                back.className = 'face back';
+                back.innerHTML = icon;
+                
+                slot.appendChild(front);
+                slot.appendChild(back);
+                grid.appendChild(slot);
+            });
+        }
+
+        function cardClick(i) {
+            if(isProcessing || turn !== 'player' || revealed.includes(i) || matched.includes(i)) return;
+            revealCard(i);
+        }
+
+        function revealCard(i) {
+            let el = document.getElementById(`card-${i}`);
+            el.classList.add('flipped');
+            revealed.push(i);
+            
+            // Add to AI Memory (simulated local tracking for state)
+            aiMemory[i] = board[i];
+
+            if(revealed.length === 2) {
+                isProcessing = true;
+                setTimeout(checkMatch, 1000);
+            }
+        }
+
+        function checkMatch() {
+            let [i1, i2] = revealed;
+            let match = board[i1] === board[i2];
+
+            if(match) {
+                matched.push(i1, i2);
+                document.getElementById(`card-${i1}`).classList.add('matched');
+                document.getElementById(`card-${i2}`).classList.add('matched');
+                scores[turn]++;
+                updateScores();
+                
+                if(matched.length === board.length) {
+                    endGame();
+                    return;
+                }
+                // If matched, keep turn? No, standard memory switches turns usually, 
+                // but usually if you match you go again. Let's make you go again.
+                // Reset processing, keep turn
+                revealed = [];
+                isProcessing = false;
+                if(turn === 'ai') setTimeout(aiTurn, 1000); // AI goes again
+            } else {
+                // No match
+                document.getElementById(`card-${i1}`).classList.remove('flipped');
+                document.getElementById(`card-${i2}`).classList.remove('flipped');
+                revealed = [];
+                isProcessing = false;
+                toggleTurn();
+            }
+        }
+
+        function toggleTurn() {
+            turn = turn === 'player' ? 'ai' : 'player';
+            updateScores();
+            if(turn === 'ai') setTimeout(aiTurn, 1000);
+        }
+
+        function updateScores() {
+            let pEl = document.getElementById('pScore');
+            let aiEl = document.getElementById('aiScore');
+            pEl.innerText = `PLAYER: ${scores.player}`;
+            aiEl.innerText = `AI CORE: ${scores.ai}`;
+            
+            if(turn === 'player') {
+                pEl.classList.add('active-turn');
+                aiEl.classList.remove('active-turn');
+            } else {
+                aiEl.classList.add('active-turn');
+                pEl.classList.remove('active-turn');
+            }
+        }
+
+        function aiTurn() {
+            // Get hidden indices
+            let hidden = [];
+            for(let i=0; i<board.length; i++) {
+                if(!matched.includes(i)) hidden.push(i);
+            }
+
+            fetch('/solve_memory', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    memory: aiMemory,
+                    hidden: hidden,
+                    board: board
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                let [m1, m2] = data.move;
+                
+                // Emulate visual "thinking"
+                setTimeout(() => revealCard(m1), 500);
+                setTimeout(() => revealCard(m2), 1500);
+            });
+        }
+
+        function endGame() {
+            let msg = scores.player > scores.ai ? "YOU WIN!" : "AI DOMINATION!";
+            if(scores.player === scores.ai) msg = "SYSTEM DRAW";
+            
+            Swal.fire({
+                title: msg,
+                text: `Final Score: ${scores.player} - ${scores.ai}`,
+                background: '#0a0a0a', color: '#ff0099',
+                confirmButtonText: 'REBOOT',
+                customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title' }
+            }).then(initGame);
+        }
+
+        function showGuide() {
+            Swal.fire({
+                title: 'MISSION BRIEF',
+                html: `
+                    <ul style="list-style: none; padding: 0; text-align: left;">
+                        <li style="margin-bottom: 10px;">► <strong>GOAL:</strong> Find matching pairs of cards.</li>
+                        <li style="margin-bottom: 10px;">► <strong>RULES:</strong> 
+                            <br>1. Flip two cards. If they match, you get a point and go again.
+                            <br>2. If they don't match, it is the opponent's turn.
+                        </li>
+                        <li style="margin-bottom: 10px;">► <strong>THE ENEMY:</strong> The AI has <strong>Perfect Recall</strong>. It remembers every card you flip. If you reveal a card it has seen before, it will likely steal the pair next turn.</li>
+                    </ul>
+                `,
+                background: '#0a0a0a', color: '#ff0099',
+                confirmButtonText: 'ACKNOWLEDGED',
+                confirmButtonColor: '#ff0099',
+                customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title', content: 'swal-custom-content' }
+            });
+        }
+
+        initGame();
+    </script>
+</body>
+</html>

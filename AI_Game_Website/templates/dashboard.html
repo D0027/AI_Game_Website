@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEURAL ARENA | Command Center</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vanilla-tilt/1.7.2/vanilla-tilt.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
+    <style>
+        /* --- RESET & CORE --- */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: #020202; color: #fff; font-family: 'Rajdhani', sans-serif;
+            overflow-x: hidden; display: flex; flex-direction: column; align-items: center;
+            min-height: 100vh;
+        }
+
+        /* --- LOADER --- */
+        #loader {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; z-index: 9999;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            transition: opacity 0.5s;
+        }
+        .scanner {
+            width: 80px; height: 80px; border: 4px solid #00ffff;
+            border-top-color: transparent; border-radius: 50%;
+            animation: spin 1s linear infinite; margin-bottom: 20px;
+        }
+        .loader-text { font-family: 'Orbitron'; color: #00ffff; animation: blink 1s infinite; letter-spacing: 3px;}
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        @keyframes blink { 50% { opacity: 0.5; } }
+
+        /* --- BACKGROUND --- */
+        #neural-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; background: radial-gradient(circle at center, #0a0a0a 0%, #000 100%); }
+        .scanlines { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.1)); background-size: 100% 4px; pointer-events: none; z-index: 100; opacity: 0.3; }
+
+        /* --- HEADER --- */
+        header { text-align: center; margin: 40px 0; z-index: 10; position: relative; width: 100%; }
+        h1 {
+            font-family: 'Orbitron', sans-serif; font-size: clamp(3rem, 8vw, 5rem); font-weight: 900;
+            color: #fff; text-transform: uppercase; letter-spacing: 10px;
+            text-shadow: 0 0 20px rgba(0, 255, 204, 0.5); margin-bottom: 10px;
+        }
+        .subtitle { font-size: 1.2rem; color: #888; letter-spacing: 3px; border-bottom: 1px solid #333; padding-bottom: 5px; display: inline-block; }
+        .subtitle span { color: #00ffcc; font-weight: bold; animation: blink 2s infinite; }
+        
+        .sys-btn {
+            position: absolute; top: 10px; right: 20px;
+            background: transparent; border: 1px solid #00ffff; color: #00ffff;
+            padding: 8px 15px; font-family: 'Orbitron'; cursor: pointer;
+            transition: 0.3s; font-size: 0.8rem; text-transform: uppercase;
+        }
+        .sys-btn:hover { background: #00ffff; color: #000; box-shadow: 0 0 15px #00ffff; }
+
+        /* Music & Voice Buttons */
+        #music-btn {
+            position: absolute; top: 10px; left: 20px;
+            background: transparent; border: 1px solid #00ffff; color: #00ffff;
+            padding: 8px 15px; font-family: 'Orbitron'; cursor: pointer; transition: 0.3s; font-size: 0.8rem;
+        }
+        #music-btn:hover { background: #00ffff; color: #000; box-shadow: 0 0 15px #00ffff; }
+
+        #voice-btn {
+            position: absolute; top: 10px; right: 140px;
+            background: transparent; border: 1px solid #00ffff; color: #00ffff;
+            padding: 8px 15px; font-family: 'Orbitron'; cursor: pointer; transition: 0.3s; font-size: 0.8rem;
+        }
+        #voice-btn:hover { background: #00ffff; color: #000; box-shadow: 0 0 15px #00ffff; }
+
+        /* --- NAV DECK (TABS) --- */
+        .nav-deck {
+            display: flex; gap: 20px; justify-content: center; margin-bottom: 30px; z-index: 10; flex-wrap: wrap;
+        }
+        .tab-btn {
+            background: rgba(0, 20, 20, 0.8); border: 1px solid #333; color: #555;
+            padding: 10px 30px; font-family: 'Orbitron'; font-size: 1rem; cursor: pointer;
+            clip-path: polygon(10% 0, 100% 0, 100% 70%, 90% 100%, 0 100%, 0 30%);
+            transition: 0.3s; letter-spacing: 2px;
+        }
+        .tab-btn:hover { color: #fff; border-color: var(--theme, #00ffff); text-shadow: 0 0 10px var(--theme, #00ffff); }
+        .tab-btn.active {
+            background: rgba(0, 255, 255, 0.1); border-color: #00ffff; color: #00ffff;
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
+        }
+
+        /* --- SECTIONS --- */
+        .section-view { display: none; width: 100%; max-width: 1400px; animation: fadeIn 0.5s; z-index: 10; padding-bottom: 50px; }
+        .section-view.active { display: flex; flex-direction: column; align-items: center; } /* Main container is flex now for search bar layout */
+        .section-view.active-flex { display: flex; flex-direction: column; align-items: center; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* --- GAME GRID --- */
+        .container {
+            display: grid; /* Grid is applied here for cards */
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 40px; width: 90%;
+        }
+        .filter-container { width: 90%; margin-bottom: 30px; display: flex; flex-direction: column; align-items: center; gap: 15px; }
+        #gameSearch {
+            width: 100%; max-width: 600px; padding: 12px; background: rgba(0,0,0,0.8); border: 1px solid #00ffff;
+            color: #fff; font-family: 'Orbitron'; font-size: 1.1rem; text-align: center; border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.1);
+        }
+        .tags { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+        .filter-btn {
+            background: rgba(0,0,0,0.5); border: 1px solid #555; color: #aaa;
+            padding: 8px 16px; font-family: 'Rajdhani'; font-weight: bold; letter-spacing: 1px;
+            cursor: pointer; transition: 0.3s;
+        }
+        .filter-btn:hover, .filter-btn.active { border-color: #00ffff; color: #00ffff; text-shadow: 0 0 8px #00ffff; background: rgba(0, 255, 255, 0.05); }
+
+        .card {
+            background: rgba(255, 255, 255, 0.02); backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 15px;
+            display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+            padding: 25px; text-decoration: none; position: relative; overflow: hidden;
+            transition: all 0.3s ease; height: 420px;
+        }
+        .card:hover { transform: translateY(-5px); border-color: var(--theme); box-shadow: 0 0 30px var(--glow); }
+        .card-visual {
+            width: 100%; height: 160px; background: rgba(0,0,0,0.3); border-radius: 10px;
+            display: flex; align-items: center; justify-content: center; font-size: 3rem; color: #555;
+            border: 1px dashed #333; transition: 0.3s;
+        }
+        .card:hover .card-visual { background: transparent; color: #fff; border-style: solid; border-color: var(--theme); color: var(--theme); text-shadow: 0 0 15px var(--theme); box-shadow: inset 0 0 15px var(--glow); }
+        .card h2 { font-family: 'Orbitron'; font-size: 1.4rem; color: #fff; margin-top: 15px; text-align: center; }
+        .tech-badge { background: #000; padding: 4px 12px; border-radius: 15px; font-size: 0.75rem; text-transform: uppercase; border: 1px solid; margin: 10px 0; letter-spacing: 1px; color: var(--theme); border-color: var(--theme); }
+        .card p { color: #aaa; font-size: 0.9rem; text-align: center; line-height: 1.5; }
+
+        /* Game Colors */
+        .card { --theme: #00ffcc; --glow: rgba(0, 255, 204, 0.2); }
+        .pacman { --theme: #ff0055; --glow: rgba(255, 0, 85, 0.2); }
+        .rps { --theme: #00ccff; --glow: rgba(0, 204, 255, 0.2); }
+        .c4 { --theme: #ffcc00; --glow: rgba(255, 204, 0, 0.2); }
+        .pong { --theme: #aa00ff; --glow: rgba(170, 0, 255, 0.2); }
+        .snake { --theme: #39ff14; --glow: rgba(57, 255, 20, 0.2); }
+        .n2048 { --theme: #ffffff; --glow: rgba(255, 255, 255, 0.2); }
+        .maze { --theme: #ff9900; --glow: rgba(255, 153, 0, 0.2); }
+        .mines { --theme: #ff00cc; --glow: rgba(255, 0, 204, 0.2); }
+        .breakout { --theme: #00ffff; --glow: rgba(0, 255, 255, 0.2); }
+        .tetris { --theme: #8a2be2; --glow: rgba(138, 43, 226, 0.2); }
+        .flappy { --theme: #32cd32; --glow: rgba(50, 205, 50, 0.2); }
+        .invaders { --theme: #00ffea; --glow: rgba(0, 255, 234, 0.2); }
+        .runner { --theme: #ffbf00; --glow: rgba(255, 191, 0, 0.2); }
+        .prophet { --theme: #e0e0e0; --glow: rgba(224, 224, 224, 0.2); }
+        .wordle { --theme: #7f00ff; --glow: rgba(127, 0, 255, 0.2); }
+        .sudoku { --theme: #0f52ba; --glow: rgba(15, 82, 186, 0.2); }
+        .memory { --theme: #ff0099; --glow: rgba(255, 0, 153, 0.2); }
+        .hanoi { --theme: #ffd700; --glow: rgba(255, 215, 0, 0.2); }
+        .network { --theme: #dc143c; --glow: rgba(220, 20, 60, 0.2); }
+        .pathfinder { --theme: #ff8c00; --glow: rgba(255, 140, 0, 0.2); }
+        .slide { --theme: #4d4dff; --glow: rgba(77, 77, 255, 0.2); }
+        .cipher { --theme: #00ff00; --glow: rgba(0, 255, 0, 0.2); }
+        .switch { --theme: #00bfff; --glow: rgba(0, 191, 255, 0.2); }
+        .knight { --theme: #9932cc; --glow: rgba(153, 50, 204, 0.2); }
+        .cluster { --theme: #00ffff; --glow: rgba(0, 255, 255, 0.2); }
+        .life { --theme: #7fff00; --glow: rgba(127, 255, 0, 0.2); }
+        .evo { --theme: #bf00ff; --glow: rgba(191, 0, 255, 0.2); }
+        .regress { --theme: #00ffaa; --glow: rgba(0, 255, 170, 0.2); }
+        .sort { --theme: #ff00ff; --glow: rgba(255, 0, 255, 0.2); }
+        .pack { --theme: #ffbf00; --glow: rgba(255, 191, 0, 0.2); }
+        .hull { --theme: #1e90ff; --glow: rgba(30, 144, 255, 0.2); }
+        .span { --theme: #ffd700; --glow: rgba(255, 215, 0, 0.2); }
+        .flow { --theme: #ff0099; --glow: rgba(255, 0, 153, 0.2); }
+        .color { --theme: #ffffff; --glow: rgba(255, 255, 255, 0.2); }
+        .queen { --theme: #00e5ff; --glow: rgba(0, 229, 255, 0.2); }
+        .match { --theme: #9400d3; --glow: rgba(148, 0, 211, 0.2); }
+
+        /* --- NEURAL LAB UI (New & Improved) --- */
+        .tool-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 40px; width: 95%; max-width: 1400px;
+        }
+
+        .tool-card {
+            background: rgba(5, 10, 15, 0.9); border: 1px solid #333; border-radius: 12px;
+            padding: 25px; position: relative; overflow: hidden;
+            transition: transform 0.3s, box-shadow 0.3s; display: flex; flex-direction: column; gap: 15px;
+        }
+        .tool-card:hover { transform: translateY(-5px); }
+
+        /* Card Variants */
+        .card-blue { border-color: #0088ff; box-shadow: 0 0 15px rgba(0, 136, 255, 0.15); }
+        .card-blue:hover { box-shadow: 0 0 25px rgba(0, 136, 255, 0.4); }
+        .card-green { border-color: #00ff88; box-shadow: 0 0 15px rgba(0, 255, 136, 0.15); }
+        .card-green:hover { box-shadow: 0 0 25px rgba(0, 255, 136, 0.4); }
+        .card-red { border-color: #ff0055; box-shadow: 0 0 15px rgba(255, 0, 85, 0.15); }
+        .card-red:hover { box-shadow: 0 0 25px rgba(255, 0, 85, 0.4); }
+
+        .tool-header { display: flex; align-items: center; gap: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; }
+        .tool-icon { font-size: 1.8rem; }
+        .card-blue .tool-icon { color: #0088ff; }
+        .card-green .tool-icon { color: #00ff88; }
+        .card-red .tool-icon { color: #ff0055; }
+
+        .tool-title h2 { font-family: 'Orbitron'; font-size: 1.2rem; margin: 0; color: #fff; letter-spacing: 1px; }
+        .tool-title p { font-size: 0.8rem; color: #888; margin: 2px 0 0 0; }
+
+        .tool-input {
+            width: 100%; background: rgba(0, 0, 0, 0.6); border: 1px solid #333;
+            color: #fff; padding: 15px; font-family: 'Rajdhani'; font-size: 1rem;
+            border-radius: 6px; resize: vertical; min-height: 100px; transition: 0.3s;
+        }
+        .tool-input:focus { outline: none; border-color: #fff; background: rgba(0,0,0,0.8); }
+
+        .tool-btn {
+            width: 100%; padding: 12px; font-family: 'Orbitron'; font-weight: bold;
+            border: none; border-radius: 4px; cursor: pointer; transition: 0.3s;
+            text-transform: uppercase; letter-spacing: 2px;
+        }
+        .btn-blue { background: rgba(0, 136, 255, 0.2); border: 1px solid #0088ff; color: #0088ff; }
+        .btn-blue:hover { background: #0088ff; color: #000; box-shadow: 0 0 15px #0088ff; }
+        .btn-green { background: rgba(0, 255, 136, 0.2); border: 1px solid #00ff88; color: #00ff88; }
+        .btn-green:hover { background: #00ff88; color: #000; box-shadow: 0 0 15px #00ff88; }
+        .btn-red { background: rgba(255, 0, 85, 0.2); border: 1px solid #ff0055; color: #ff0055; }
+        .btn-red:hover { background: #ff0055; color: #000; box-shadow: 0 0 15px #ff0055; }
+
+        .tool-result {
+            background: rgba(255, 255, 255, 0.03); border-radius: 6px; padding: 15px;
+            font-family: 'Consolas', monospace; font-size: 0.9rem; min-height: 60px;
+            display: flex; align-items: center; border-left: 3px solid #555;
+        }
+
+        /* --- TERMINAL & FOOTER --- */
+        .terminal-window {
+            position: fixed; bottom: 20px; right: 20px; width: 300px; height: 160px;
+            background: rgba(0, 0, 0, 0.9); border: 1px solid #00ffff; border-radius: 5px;
+            font-family: 'Consolas', 'Monaco', monospace; z-index: 999;
+            display: flex; flex-direction: column; box-shadow: 0 0 20px rgba(0, 255, 255, 0.1);
+        }
+        @media (max-width: 768px) { .terminal-window { display: none; } }
+        .terminal-header { background: #003333; padding: 5px 10px; font-size: 0.75rem; color: #00ffff; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #00ffff; }
+        .term-btns { display: flex; gap: 5px; }
+        .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+        .red { background: #ff5f56; } .yellow { background: #ffbd2e; } .green { background: #27c93f; }
+        .terminal-content { padding: 10px; font-size: 0.7rem; color: #00ffcc; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; }
+        .log-entry { margin: 2px 0; opacity: 0.8; text-shadow: 0 0 5px #00ffcc; }
+
+        footer { width: 100%; padding: 30px 0; text-align: center; color: #666; font-size: 0.9rem; z-index: 10; margin-top: auto; }
+        .footer-line { width: 80%; height: 1px; background: linear-gradient(90deg, transparent, #00ffff, transparent); margin: 0 auto 20px auto; opacity: 0.3; }
+        .socials a { color: #888; text-decoration: none; margin: 0 10px; transition: 0.3s; }
+        .socials a:hover { color: #00ffff; text-shadow: 0 0 10px #00ffff; }
+        
+        .swal-custom-popup { background: #0a0a0a !important; border: 2px solid #00ffff !important; }
+        .swal-custom-title { color: #00ffff !important; font-family: 'Orbitron' !important; }
+        .swal-custom-content { color: #ccc !important; font-family: 'Rajdhani' !important; font-size: 1.1rem; text-align: left;}
+
+    </style>
+</head>
+<body>
+
+    <div id="loader">
+        <div class="scanner"></div>
+        <div class="loader-text">INITIALIZING NEURAL NETWORK...</div>
+    </div>
+
+    <canvas id="neural-bg"></canvas>
+    <div class="scanlines"></div>
+
+    <audio id="bg-music" loop>
+        <source src="https://files.freemusicarchive.org/storage-freemusicarchive-org/music/no_curator/KieLoKaz/Free_Ganymed/KieLoKaz_-_01_-_Reunion_of_the_Spirits_Kielokaz_ID_365.mp3" type="audio/mpeg">
+    </audio>
+
+    <div class="terminal-window">
+        <div class="terminal-header">
+            <span>NEURAL_LOGS.exe</span>
+            <div class="term-btns">
+                <span class="dot red"></span>
+                <span class="dot yellow"></span>
+                <span class="dot green"></span>
+            </div>
+        </div>
+        <div class="terminal-content" id="sys-log">
+            <p class="log-entry">[INIT] SYSTEM BOOT SEQUENCE INITIATED...</p>
+            <p class="log-entry">[AUTH] ADMIN ACCESS GRANTED.</p>
+            <p class="log-entry">[LOAD] 43 ALGORITHMS ONLINE.</p>
+        </div>
+    </div>
+
+    <header>
+        <button onclick="toggleMusic()" id="music-btn">MUSIC: OFF</button>
+        <button onclick="toggleVoice()" id="voice-btn">MIC: OFF</button>
+        <button onclick="showSystemInfo()" class="sys-btn">SYSTEM INFO</button>
+        <h1>NEURAL ARENA</h1>
+        <div class="subtitle">ADVANCED AI SIMULATION HUB // <span>SYSTEM ONLINE</span></div>
+    </header>
+
+    <div class="nav-deck">
+        <button class="tab-btn active" onclick="switchSection('games', this)">GAMES GRID</button>
+        <button class="tab-btn" onclick="switchSection('lab', this)">NEURAL LAB</button>
+        <button class="tab-btn" style="opacity:0.5; cursor:not-allowed;">SECURITY (LOCKED)</button>
+        <button class="tab-btn" style="opacity:0.5; cursor:not-allowed;">DATA NEXUS (LOCKED)</button>
+    </div>
+
+    <div id="games-section" class="section-view active">
+        <div class="filter-container">
+            <input type="text" id="gameSearch" placeholder="SEARCH PROTOCOLS..." onkeyup="filterGames()">
+            <div class="tags">
+                <button class="filter-btn active" onclick="filterCategory('all')">ALL</button>
+                <button class="filter-btn" onclick="filterCategory('classic')">CLASSIC</button>
+                <button class="filter-btn" onclick="filterCategory('ai')">AI LOGIC</button>
+                <button class="filter-btn" onclick="filterCategory('path')">PATHFINDING</button>
+                <button class="filter-btn" onclick="filterCategory('opt')">OPTIMIZATION</button>
+            </div>
+        </div>
+
+        <div class="container">
+            
+            <a href="/tictactoe" class="card" data-cat="classic ai" data-tilt>
+                <div class="card-visual">X / O</div>
+                <h2>TIC-TAC-TOE</h2>
+                <div class="tech-badge">Minimax Algorithm</div>
+                <p>Challenge the Unbeatable AI. Calculates 300,000+ futures.</p>
+            </a>
+
+            <a href="/pacman" class="card pacman" data-cat="classic path" data-tilt>
+                <div class="card-visual">ᗧ • •</div>
+                <h2>NEON PAC-MAN</h2>
+                <div class="tech-badge">A* Pathfinding</div>
+                <p>Survival Mode. Two AIs (Hunter & Tactician) collaborate.</p>
+            </a>
+
+            <a href="/rps" class="card rps" data-cat="ai" data-tilt>
+                <div class="card-visual">R / P / S</div>
+                <h2>MIND READER</h2>
+                <div class="tech-badge">Markov Chains</div>
+                <p>Psychological Warfare. The AI learns your patterns.</p>
+            </a>
+
+            <a href="/connect4" class="card c4" data-cat="classic ai" data-tilt>
+                <div class="card-visual">● ● ● ●</div>
+                <h2>NEON CONNECT</h2>
+                <div class="tech-badge">Alpha-Beta Pruning</div>
+                <p>Gravity strategy. The AI thinks 5 moves ahead.</p>
+            </a>
+
+            <a href="/pong" class="card pong" data-cat="classic ai" data-tilt>
+                <div class="card-visual">| • |</div>
+                <h2>NEON PONG</h2>
+                <div class="tech-badge">Trajectory Prediction</div>
+                <p>Reflex Test. The AI calculates collision physics.</p>
+            </a>
+
+            <a href="/snake" class="card snake" data-cat="classic path" data-tilt>
+                <div class="card-visual">◳ ◱ ◲</div>
+                <h2>NEON SERPENT</h2>
+                <div class="tech-badge">BFS Algorithm</div>
+                <p>Pathfinding. Activate 'Autopilot' to let the Neural Network hunt.</p>
+            </a>
+
+            <a href="/2048" class="card n2048" data-cat="classic ai" data-tilt>
+                <div class="card-visual">2048</div>
+                <h2>NEON 2048</h2>
+                <div class="tech-badge">Expectimax Search</div>
+                <p>Probability Engine. The AI maximizes score.</p>
+            </a>
+
+            <a href="/maze" class="card maze" data-cat="path" data-tilt>
+                <div class="card-visual">╚ ╗ ╔</div>
+                <h2>NEON MAZE</h2>
+                <div class="tech-badge">A* Search</div>
+                <p>Speed Run. Race against a Heuristic Search AI.</p>
+            </a>
+
+            <a href="/mines" class="card mines" data-cat="classic ai" data-tilt>
+                <div class="card-visual">X 1 0</div>
+                <h2>NEON MINES</h2>
+                <div class="tech-badge">Constraint Solving</div>
+                <p>Deduction Engine. Calculates mine probability.</p>
+            </a>
+
+            <a href="/breakout" class="card breakout" data-cat="classic ai" data-tilt>
+                <div class="card-visual">▂ ▃ ▅</div>
+                <h2>NEON BREAKOUT</h2>
+                <div class="tech-badge">Reflex Agent</div>
+                <p>Destruction Physics. The AI predicts ball ricochets.</p>
+            </a>
+
+            <a href="/tetris" class="card tetris" data-cat="classic ai" data-tilt>
+                <div class="card-visual">凸</div>
+                <h2>NEON TETRIS</h2>
+                <div class="tech-badge">Heuristic Search</div>
+                <p>Structure Optimization. Minimizes holes and height.</p>
+            </a>
+
+            <a href="/flappy" class="card flappy" data-cat="ai" data-tilt>
+                <div class="card-visual">⪡ ⪢</div>
+                <h2>NEON FLAPPY</h2>
+                <div class="tech-badge">Neuroevolution</div>
+                <p>Genetic Learning. The AI calculates inputs to flap.</p>
+            </a>
+
+            <a href="/invaders" class="card invaders" data-cat="classic ai" data-tilt>
+                <div class="card-visual">▲ ▼ ▲</div>
+                <h2>NEON INVADERS</h2>
+                <div class="tech-badge">Tactical Heuristics</div>
+                <p>Defense System. Prioritizes survival over aggression.</p>
+            </a>
+
+            <a href="/runner" class="card runner" data-cat="ai" data-tilt>
+                <div class="card-visual">🏃 ⚡ 🚧</div>
+                <h2>NEON RUNNER</h2>
+                <div class="tech-badge">Genetic Algorithm</div>
+                <p>Evolutionary Speed. AI adapts jump timing.</p>
+            </a>
+
+            <a href="/guesswho" class="card prophet" data-cat="ai" data-tilt>
+                <div class="card-visual">? ¿ ?</div>
+                <h2>NEON PROPHET</h2>
+                <div class="tech-badge">Decision Tree</div>
+                <p>Binary Search. The AI narrows down possibilities.</p>
+            </a>
+
+            <a href="/wordle" class="card wordle" data-cat="classic ai" data-tilt>
+                <div class="card-visual">A _ B _ Y</div>
+                <h2>NEON WORDLE</h2>
+                <div class="tech-badge">Entropy Search</div>
+                <p>Linguistic Decoding. Maximizes information gain.</p>
+            </a>
+
+            <a href="/sudoku" class="card sudoku" data-cat="classic ai" data-tilt>
+                <div class="card-visual"># # #</div>
+                <h2>NEON SUDOKU</h2>
+                <div class="tech-badge">Backtracking</div>
+                <p>Constraint Logic. Explores recursive paths.</p>
+            </a>
+
+            <a href="/memory" class="card memory" data-cat="classic" data-tilt>
+                <div class="card-visual">🧠 ⚡ 👁️</div>
+                <h2>NEON CORTEX</h2>
+                <div class="tech-badge">Perfect Recall</div>
+                <p>Memory Match. The AI remembers every card.</p>
+            </a>
+
+            <a href="/hanoi" class="card hanoi" data-cat="classic ai" data-tilt>
+                <div class="card-visual">📚 ➡ 📚</div>
+                <h2>NEON HANOI</h2>
+                <div class="tech-badge">Recursion</div>
+                <p>Recursive Logic. Decomposes the problem.</p>
+            </a>
+
+            <a href="/network" class="card network" data-cat="opt path" data-tilt>
+                <div class="card-visual">☍</div>
+                <h2>NEON NETWORK</h2>
+                <div class="tech-badge">Simulated Annealing</div>
+                <p>TSP Solver. Untangles the chaotic web.</p>
+            </a>
+
+            <a href="/path" class="card pathfinder" data-cat="path" data-tilt>
+                <div class="card-visual">⬡ ⬢ ⬡</div>
+                <h2>NEON PATH</h2>
+                <div class="tech-badge">BFS Search</div>
+                <p>Shortest Path Logic. Scans node layers.</p>
+            </a>
+
+            <a href="/slide" class="card slide" data-cat="classic ai" data-tilt>
+                <div class="card-visual">1 2 3</div>
+                <h2>NEON SLIDE</h2>
+                <div class="tech-badge">A* Search</div>
+                <p>8-Puzzle. Calculates Manhattan Distance.</p>
+            </a>
+
+            <a href="/cipher" class="card cipher" data-cat="ai" data-tilt>
+                <div class="card-visual">🔒</div>
+                <h2>NEON CIPHER</h2>
+                <div class="tech-badge">Knuth's Algo</div>
+                <p>Mastermind. Analyzes feedback constraints.</p>
+            </a>
+
+            <a href="/switch" class="card switch" data-cat="classic ai" data-tilt>
+                <div class="card-visual">▣ ▣ ▣</div>
+                <h2>NEON SWITCH</h2>
+                <div class="tech-badge">Greedy Algo</div>
+                <p>Lights Out. Chases active bits row by row.</p>
+            </a>
+
+            <a href="/knight" class="card knight" data-cat="path ai" data-tilt>
+                <div class="card-visual">♞</div>
+                <h2>NEON KNIGHT</h2>
+                <div class="tech-badge">Warnsdorff's Rule</div>
+                <p>Knight's Tour. Optimizes moves to visit once.</p>
+            </a>
+
+            <a href="/cluster" class="card cluster" data-cat="ai opt" data-tilt>
+                <div class="card-visual">⁖ ⁘</div>
+                <h2>NEON CLUSTER</h2>
+                <div class="tech-badge">K-Means Algo</div>
+                <p>Unsupervised Learning. Organizes raw data.</p>
+            </a>
+
+            <a href="/life" class="card life" data-cat="classic ai" data-tilt>
+                <div class="card-visual">🦠</div>
+                <h2>NEON LIFE</h2>
+                <div class="tech-badge">Cellular Automata</div>
+                <p>Game of Life. Complex patterns from simple rules.</p>
+            </a>
+
+            <a href="/evo" class="card evo" data-cat="ai opt" data-tilt>
+                <div class="card-visual">🧬</div>
+                <h2>NEON EVO</h2>
+                <div class="tech-badge">Genetic Algo</div>
+                <p>Evolution. Evolve chaos into data strings.</p>
+            </a>
+
+            <a href="/regress" class="card regress" data-cat="ai" data-tilt>
+                <div class="card-visual">📈</div>
+                <h2>NEON REGRESS</h2>
+                <div class="tech-badge">Linear Regression</div>
+                <p>Predictive Modeling. Calculates line of best fit.</p>
+            </a>
+
+            <a href="/sort" class="card sort" data-cat="ai opt" data-tilt>
+                <div class="card-visual">ılıll</div>
+                <h2>NEON SORT</h2>
+                <div class="tech-badge">Sorting Algos</div>
+                <p>Algorithm Vis. Bubble, Quick, and Merge sort.</p>
+            </a>
+
+            <a href="/pack" class="card pack" data-cat="opt" data-tilt>
+                <div class="card-visual">▣ ▤ ▥</div>
+                <h2>NEON PACK</h2>
+                <div class="tech-badge">Bin Packing</div>
+                <p>Optimization. Minimizes waste.</p>
+            </a>
+
+            <a href="/hull" class="card hull" data-cat="ai opt" data-tilt>
+                <div class="card-visual">⬡</div>
+                <h2>NEON HULL</h2>
+                <div class="tech-badge">Monotone Chain</div>
+                <p>Geometry. Calculates tightest boundary.</p>
+            </a>
+
+            <a href="/span" class="card span" data-cat="path opt" data-tilt>
+                <div class="card-visual">☊</div>
+                <h2>NEON SPAN</h2>
+                <div class="tech-badge">Prim's Algo</div>
+                <p>MST. Connect nodes with minimum wiring.</p>
+            </a>
+
+            <a href="/flow" class="card flow" data-cat="path opt" data-tilt>
+                <div class="card-visual">🌊</div>
+                <h2>NEON FLOW</h2>
+                <div class="tech-badge">Edmonds-Karp</div>
+                <p>Max Flow. Saturates the network.</p>
+            </a>
+
+            <a href="/color" class="card color" data-cat="ai opt" data-tilt>
+                <div class="card-visual">● - ●</div>
+                <h2>NEON COLOR</h2>
+                <div class="tech-badge">DSatur Algo</div>
+                <p>Graph Coloring. Assign frequencies.</p>
+            </a>
+
+            <a href="/queen" class="card queen" data-cat="classic ai" data-tilt>
+                <div class="card-visual">♛</div>
+                <h2>NEON QUEEN</h2>
+                <div class="tech-badge">Backtracking</div>
+                <p>N-Queens. Place 8 Queens safely.</p>
+            </a>
+            
+            <a href="/match" class="card match" data-cat="classic ai" data-tilt>
+                <div class="card-visual">🂠 🂠</div>
+                <h2>NEON MATCH</h2>
+                <div class="tech-badge">Memory Agent</div>
+                <p>Concentration. Test memory against an AI.</p>
+            </a>
+        </div>
+    </div>
+
+    <div id="lab-section" class="section-view active-flex" style="display:none;">
+        <div class="tool-grid">
+            
+            <div class="tool-card card-blue">
+                <div class="tool-header">
+                    <i class="fas fa-brain tool-icon"></i>
+                    <div class="tool-title">
+                        <h2>SENTIMENT SCANNER</h2>
+                        <p>NLP Engine: Detects emotion polarity.</p>
+                    </div>
+                </div>
+                <textarea id="sentiment-input" class="tool-input" placeholder="> Enter text sequence for analysis..."></textarea>
+                <button class="tool-btn btn-blue" onclick="runTool('sentiment')">INITIALIZE SCAN</button>
+                <div id="sentiment-result" class="tool-result">STATUS: AWAITING INPUT</div>
+            </div>
+
+            <div class="tool-card card-green">
+                <div class="tool-header">
+                    <i class="fas fa-file-alt tool-icon"></i>
+                    <div class="tool-title">
+                        <h2>DATA SUMMARIZER</h2>
+                        <p>Frequency Algo: Condenses reports.</p>
+                    </div>
+                </div>
+                <textarea id="summary-input" class="tool-input" placeholder="> Paste long document stream..."></textarea>
+                <button class="tool-btn btn-green" onclick="runTool('summary')">COMPRESS DATA</button>
+                <div id="summary-result" class="tool-result">STATUS: AWAITING INPUT</div>
+            </div>
+
+            <div class="tool-card card-red">
+                <div class="tool-header">
+                    <i class="fas fa-shield-alt tool-icon"></i>
+                    <div class="tool-title">
+                        <h2>SPAM HUNTER</h2>
+                        <p>Naive Bayes: Detects malicious packets.</p>
+                    </div>
+                </div>
+                <textarea id="spam-input" class="tool-input" placeholder="> Input message content..."></textarea>
+                <button class="tool-btn btn-red" onclick="runTool('spam')">SCAN THREAT</button>
+                <div id="spam-result" class="tool-result">STATUS: SYSTEM READY</div>
+            </div>
+
+        </div>
+    </div>
+
+    <footer>
+        <div class="footer-line"></div>
+        <p>NEURAL ARENA // SYSTEM VERSION 1.0</p>
+        <p>DESIGNED & ENGINEERED BY <span style="color: #00ffff;">DEEPAK</span></p>
+        <div class="socials">
+            <a href="https://github.com/D0027" target="_blank">GITHUB</a> • 
+            <a href="https://www.linkedin.com/in/deepakyadav027" target="_blank">LINKEDIN</a> • 
+            <a href="https://dy0169489.wixsite.com/deepak-yadav" target="_blank">PORTFOLIO</a>
+        </div>
+    </footer>
+
+    <script>
+        // --- 1. INITIALIZE VANILLA TILT ---
+        VanillaTilt.init(document.querySelectorAll(".card"), { max: 15, speed: 400, glare: true, "max-glare": 0.2 });
+
+        // --- 2. LOADER ---
+        window.onload = function() {
+            document.getElementById('loader').style.opacity = '0';
+            setTimeout(() => document.getElementById('loader').style.display = 'none', 500);
+        }
+
+        // --- 3. FILTER LOGIC ---
+        function filterGames() {
+            let input = document.getElementById('gameSearch').value.toUpperCase();
+            let cards = document.getElementsByClassName('card');
+            for (let i = 0; i < cards.length; i++) {
+                let title = cards[i].getElementsByTagName("h2")[0];
+                if (title.innerText.toUpperCase().indexOf(input) > -1) cards[i].style.display = "";
+                else cards[i].style.display = "none";
+            }
+        }
+
+        function filterCategory(cat) {
+            let cards = document.getElementsByClassName('card');
+            let btns = document.getElementsByClassName('filter-btn');
+            for(let b of btns) b.classList.remove('active');
+            event.target.classList.add('active');
+            for (let i = 0; i < cards.length; i++) {
+                let categories = cards[i].getAttribute('data-cat');
+                if (cat === 'all' || categories.includes(cat)) cards[i].style.display = "";
+                else cards[i].style.display = "none";
+            }
+        }
+
+        // --- 4. TAB SWITCHING ---
+        function switchSection(sectionId, btn) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            if(btn) btn.classList.add('active');
+            document.getElementById('games-section').style.display = 'none';
+            document.getElementById('lab-section').style.display = 'none';
+            if(sectionId === 'games') {
+                document.getElementById('games-section').style.display = 'flex'; // Because .section-view uses flex for centering
+                // but .container uses grid. 
+                document.getElementById('games-section').classList.add('active');
+            }
+            else if (sectionId === 'lab') {
+                document.getElementById('lab-section').style.display = 'flex';
+                document.getElementById('lab-section').classList.add('active-flex');
+            }
+        }
+
+        // --- 5. REAL TOOL LOGIC ---
+        function runTool(toolName) {
+            const inputId = toolName + '-input';
+            const resultId = toolName + '-result';
+            const textData = document.getElementById(inputId).value;
+            const resultBox = document.getElementById(resultId);
+
+            if(!textData) { 
+                resultBox.style.display = 'flex'; // Changed to flex for alignment
+                resultBox.innerHTML = '<span style="color:orange">Input required.</span>';
+                return;
+            }
+            
+            resultBox.style.display = 'flex';
+            resultBox.innerHTML = '<span style="color:#0088ff">PROCESSING DATA... <span class="scanner" style="width:10px; height:10px; border-width:2px; display:inline-block;"></span></span>';
+
+            fetch('/tool_' + toolName, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: textData })
+            })
+            .then(response => response.json())
+            .then(data => { resultBox.innerHTML = data.html; })
+            .catch(error => { console.error('Error:', error); resultBox.innerHTML = '<span style="color:red">SYSTEM ERROR: Neural Link Severed.</span>'; });
+        }
+
+        // --- 6. SYSTEM INFO MODAL ---
+        function showSystemInfo() {
+            Swal.fire({
+                title: 'SYSTEM ARCHITECTURE',
+                html: '<div style="text-align: left; font-size: 0.9rem; line-height: 1.6;">' +
+                      '<strong style="color:#00ffff">CORE:</strong> Python Flask Backend<br>' +
+                      '<strong style="color:#00ffff">INTERFACE:</strong> HTML5 / CSS3 / Vanilla JS<br>' +
+                      '<strong style="color:#00ffff">ALGORITHMS:</strong><br>' +
+                      '- A* Search, Minimax, Alpha-Beta<br>' +
+                      '- Genetic Algorithms, Neural Heuristics<br>' +
+                      '- Constraint Solving & Backtracking' +
+                      '</div>',
+                background: '#0a0a0a', color: '#fff', confirmButtonColor: '#00ffff',
+                confirmButtonText: 'CLOSE TERMINAL',
+                customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title', content: 'swal-custom-content' }
+            });
+        }
+
+        // --- 7. AUDIO TOGGLE ---
+        const audio = document.getElementById('bg-music');
+        audio.volume = 0.4;
+        function toggleMusic() {
+            if (audio.paused) {
+                let playPromise = audio.play();
+                if (playPromise !== undefined) {
+                    playPromise.then(_ => {
+                        document.getElementById('music-btn').innerText = "MUSIC: ON";
+                        addLog("[SYS] AUDIO STREAM ACTIVE.", "#00ff00");
+                    }).catch(error => { Swal.fire({icon: 'warning', title: 'AUDIO BLOCKED', text: 'Click anywhere on the page first!', background:'#000', color:'#00ffff'}); });
+                }
+            } else {
+                audio.pause();
+                document.getElementById('music-btn').innerText = "MUSIC: OFF";
+                addLog("[SYS] AUDIO MUTED.", "#ff5f56");
+            }
+        }
+
+        // --- 8. VOICE COMMAND SYSTEM ---
+        const gamesDB = {
+            "tic tac toe": "/tictactoe", "pacman": "/pacman", "mind reader": "/rps", "connect 4": "/connect4",
+            "pong": "/pong", "snake": "/snake", "2048": "/2048", "maze": "/maze", "mines": "/mines",
+            "breakout": "/breakout", "tetris": "/tetris", "flappy": "/flappy", "invaders": "/invaders",
+            "runner": "/runner", "prophet": "/guesswho", "wordle": "/wordle", "sudoku": "/sudoku",
+            "memory": "/memory", "hanoi": "/hanoi", "network": "/network", "path": "/path",
+            "slide": "/slide", "cipher": "/cipher", "switch": "/switch", "knight": "/knight",
+            "cluster": "/cluster", "life": "/life", "evo": "/evo", "regress": "/regress", "sort": "/sort",
+            "pack": "/pack", "hull": "/hull", "span": "/span", "flow": "/flow", "color": "/color",
+            "queen": "/queen", "match": "/match"
+        };
+
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        let recognition; let isListening = false;
+
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.continuous = true; recognition.lang = 'en-US';
+            recognition.onstart = function() { addLog(`[VOICE] LISTENING...`, '#00ff00'); const btn = document.getElementById('voice-btn'); if(btn) btn.innerText = "MIC: ON"; };
+            recognition.onend = function() { if (isListening) recognition.start(); };
+            recognition.onresult = function(event) {
+                const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase().trim();
+                processCommand(transcript);
+            };
+        }
+
+        function toggleVoice() {
+            if (!SpeechRecognition) { Swal.fire({icon:'error', title:'Error', text:'Use Chrome/Edge for Voice Features'}); return; }
+            if (isListening) { recognition.stop(); isListening = false; document.getElementById('voice-btn').innerText = "MIC: OFF"; }
+            else { recognition.start(); isListening = true; document.getElementById('voice-btn').innerText = "MIC: LISTENING"; }
+        }
+
+        function processCommand(cmd) {
+            addLog(`[USER] >> "${cmd}"`);
+            for (let [key, url] of Object.entries(gamesDB)) {
+                if (cmd.includes(key)) {
+                    addLog(`[SYS] LAUNCHING ${key.toUpperCase()}...`, '#00ffff');
+                    setTimeout(() => window.location.href = url, 1000); return;
+                }
+            }
+            if (cmd.includes("mute") || cmd.includes("stop music")) { audio.pause(); document.getElementById('music-btn').innerText = "MUSIC: OFF"; addLog("[SYS] AUDIO MUTED"); }
+            else if (cmd.includes("play music")) { audio.play(); document.getElementById('music-btn').innerText = "MUSIC: ON"; addLog("[SYS] AUDIO PLAYING"); }
+            else if (cmd.includes("system info") || cmd.includes("status")) { showSystemInfo(); }
+        }
+
+        // --- 9. TERMINAL LOGIC ---
+        function addLog(text, color = '#00ffcc') {
+            const term = document.getElementById('sys-log');
+            const time = new Date().toLocaleTimeString('en-US', {hour12: false});
+            const p = document.createElement('p'); p.className = 'log-entry'; p.style.color = color;
+            p.innerText = `[${time}] ${text}`; term.appendChild(p); term.scrollTop = term.scrollHeight;
+            if(term.children.length > 6) term.removeChild(term.children[0]);
+        }
+        setInterval(() => {
+            const msgs = ["[NET] Scanning ports...", "[SYS] Neural link stable.", "[AI] Optimizing weights...", "[SEC] Firewall active."];
+            addLog(msgs[Math.floor(Math.random() * msgs.length)]);
+        }, 4000);
+
+        // --- 10. PARTICLES ---
+        const canvas = document.getElementById('neural-bg'); const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+        let particlesArray = [];
+        class Particle {
+            constructor() { this.x = Math.random() * canvas.width; this.y = Math.random() * canvas.height; this.size = Math.random() * 2; this.speedX = (Math.random() * 1.5) - 0.75; this.speedY = (Math.random() * 1.5) - 0.75; this.color = '#00ffcc'; }
+            update() { this.x += this.speedX; this.y += this.speedY; if (this.x < 0 || this.x > canvas.width) this.speedX *= -1; if (this.y < 0 || this.y > canvas.height) this.speedY *= -1; }
+            draw() { ctx.fillStyle = this.color; ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fill(); }
+        }
+        function init() { particlesArray = []; for (let i = 0; i < (canvas.height * canvas.width) / 10000; i++) particlesArray.push(new Particle()); }
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let i = 0; i < particlesArray.length; i++) {
+                particlesArray[i].update(); particlesArray[i].draw();
+                for (let j = i; j < particlesArray.length; j++) {
+                    let dx = particlesArray[i].x - particlesArray[j].x; let dy = particlesArray[i].y - particlesArray[j].y; let distance = dx*dx + dy*dy;
+                    if (distance < (canvas.width/7) * (canvas.height/7)) { ctx.strokeStyle = 'rgba(0, 255, 204,' + (1 - distance/20000) + ')'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(particlesArray[i].x, particlesArray[i].y); ctx.lineTo(particlesArray[j].x, particlesArray[j].y); ctx.stroke(); }
+                }
+            }
+            requestAnimationFrame(animate);
+        }
+        window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; init(); });
+        init(); animate();
+    </script>
+</body>
+</html>

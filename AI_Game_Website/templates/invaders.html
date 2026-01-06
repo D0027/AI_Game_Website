@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEURAL ARENA | Neon Invaders</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        /* --- CORE STYLES --- */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: #020202; color: #fff; font-family: 'Rajdhani', sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+            min-height: 100vh; overflow-y: auto; padding-top: 20px; padding-bottom: 50px;
+            user-select: none;
+        }
+        #neural-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; background: radial-gradient(circle at center, #00111a 0%, #000 100%); }
+        .scanlines { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2)); background-size: 100% 4px; pointer-events: none; z-index: -1; opacity: 0.3; }
+
+        .back-btn { position: absolute; top: 30px; left: 30px; text-decoration: none; color: #00ffea; font-family: 'Orbitron'; font-size: 1rem; border: 1px solid #00ffea; padding: 10px 20px; border-radius: 5px; transition: 0.3s; background: rgba(0, 255, 234, 0.1); }
+        .back-btn:hover { background-color: #00ffea; color: #000; box-shadow: 0 0 25px #00ffea; }
+
+        h1 { font-family: 'Orbitron'; font-size: 3.5rem; text-shadow: 2px 2px 0px #ff0055; color: #00ffea; margin-bottom: 10px; margin-top: 40px; }
+        .score-board { font-family: 'Orbitron'; font-size: 2rem; margin-bottom: 15px; color: #fff; }
+
+        #gameCanvas {
+            background: rgba(0, 10, 20, 0.9);
+            border: 2px solid #00ffea;
+            box-shadow: 0 0 40px rgba(0, 255, 234, 0.2);
+            border-radius: 5px;
+            cursor: crosshair;
+        }
+
+        .controls-area { margin-top: 20px; display: flex; gap: 20px; }
+        button {
+            padding: 10px 30px; font-family: 'Orbitron'; font-size: 1rem; color: #000; background: #00ffea;
+            border: none; cursor: pointer; border-radius: 5px; box-shadow: 0 0 20px #00ffea; transition: 0.3s;
+        }
+        button:hover { transform: scale(1.1); box-shadow: 0 0 40px #00ffea; }
+        .btn-ai.active { background: #ff0055; color: #fff; box-shadow: 0 0 20px #ff0055; }
+
+        .instructions { margin-top: 15px; color: #888; font-family: 'Orbitron'; letter-spacing: 1px; font-size: 0.9rem; }
+        .swal-custom-popup { background: #0a0a0a !important; border: 2px solid #00ffea !important; }
+        .swal-custom-title { color: #00ffea !important; font-family: 'Orbitron' !important; }
+    </style>
+</head>
+<body>
+    <canvas id="neural-bg"></canvas>
+    <div class="scanlines"></div>
+
+    <a href="/" class="back-btn">← DASHBOARD</a>
+    <h1>NEON INVADERS</h1>
+    <div class="score-board">SCORE: <span id="score">0</span></div>
+
+    <canvas id="gameCanvas" width="600" height="600"></canvas>
+
+    <div class="controls-area">
+        <button onclick="startGame()">REBOOT SYSTEM</button>
+        <button id="aiBtn" class="btn-ai" onclick="toggleAI()">ACTIVATE TACTICAL AI</button>
+    </div>
+    <div class="instructions">ARROWS to Move • SPACE to Fire</div>
+
+    <script>
+        const bgCanvas = document.getElementById('neural-bg'); const bgCtx = bgCanvas.getContext('2d');
+        bgCanvas.width = window.innerWidth; bgCanvas.height = window.innerHeight;
+        let bgParticles=[]; class Particle{constructor(){this.x=Math.random()*bgCanvas.width;this.y=Math.random()*bgCanvas.height;this.size=Math.random()*2;this.speedY=(Math.random()*0.5)+0.2;this.color='#00ffea';}update(){this.y+=this.speedY;if(this.y>bgCanvas.height)this.y=0;}draw(){bgCtx.fillStyle=this.color;bgCtx.beginPath();bgCtx.arc(this.x,this.y,this.size,0,Math.PI*2);bgCtx.fill();}}
+        function initBg(){bgParticles=[];for(let i=0;i<100;i++)bgParticles.push(new Particle());}
+        function animateBg(){bgCtx.clearRect(0,0,bgCanvas.width,bgCanvas.height);for(let i=0;i<bgParticles.length;i++){bgParticles[i].update();bgParticles[i].draw();}requestAnimationFrame(animateBg);}
+        window.addEventListener('resize',()=>{bgCanvas.width=window.innerWidth;bgCanvas.height=window.innerHeight;initBg();});initBg();animateBg();
+    </script>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Game Objects
+        let player = { x: 275, y: 550, w: 40, h: 20, color: '#00ffea', speed: 5 };
+        let bullets = [];
+        let enemyBullets = [];
+        let enemies = [];
+        let particles = [];
+        
+        // State
+        let score = 0;
+        let gameRunning = true;
+        let isAI = false;
+        let waveDirection = 1;
+        let enemySpeed = 1;
+        let moveDown = false;
+        let keys = { ArrowLeft: false, ArrowRight: false, Space: false };
+        let lastShot = 0;
+
+        function initGame() {
+            score = 0;
+            document.getElementById('score').innerText = 0;
+            player.x = 275;
+            bullets = [];
+            enemyBullets = [];
+            particles = [];
+            enemies = [];
+            enemySpeed = 1;
+            
+            // Spawn Enemies
+            for(let r=0; r<4; r++) {
+                for(let c=0; c<8; c++) {
+                    enemies.push({
+                        x: 50 + c * 60,
+                        y: 50 + r * 50,
+                        w: 30, h: 30,
+                        alive: true,
+                        color: r === 0 ? '#ff0055' : (r === 1 ? '#ffcc00' : '#00ff00') 
+                    });
+                }
+            }
+            gameRunning = true;
+            loop();
+        }
+
+        function spawnParticles(x, y, color) {
+            for(let i=0; i<8; i++) {
+                particles.push({
+                    x: x, y: y,
+                    vx: (Math.random() - 0.5) * 6,
+                    vy: (Math.random() - 0.5) * 6,
+                    life: 1.0,
+                    color: color
+                });
+            }
+        }
+
+        function update() {
+            if(!gameRunning) return;
+
+            // Player Movement
+            if(!isAI) {
+                if(keys.ArrowLeft && player.x > 0) player.x -= player.speed;
+                if(keys.ArrowRight && player.x < canvas.width - player.w) player.x += player.speed;
+                if(keys.Space && Date.now() - lastShot > 300) {
+                    bullets.push({x: player.x + player.w/2, y: player.y, w: 4, h: 10, color: '#fff'});
+                    lastShot = Date.now();
+                }
+            } else {
+                runAI();
+            }
+
+            // Bullet Movement
+            bullets.forEach(b => b.y -= 7);
+            bullets = bullets.filter(b => b.y > 0);
+
+            enemyBullets.forEach(b => b.y += 4);
+            
+            // Enemy Movement
+            let edgeHit = false;
+            enemies.forEach(e => {
+                if(!e.alive) return;
+                e.x += enemySpeed * waveDirection;
+                if(e.x + e.w > canvas.width || e.x < 0) edgeHit = true;
+                
+                // Random Fire
+                if(Math.random() < 0.005) {
+                    enemyBullets.push({x: e.x + e.w/2, y: e.y + e.h, w: 6, h: 12, color: '#ff0055'});
+                }
+            });
+
+            if(edgeHit) {
+                waveDirection *= -1;
+                enemies.forEach(e => e.y += 20); // Move down
+            }
+
+            // Collisions
+            bullets.forEach((b, bi) => {
+                enemies.forEach((e, ei) => {
+                    if(e.alive && b.x > e.x && b.x < e.x + e.w && b.y > e.y && b.y < e.y + e.h) {
+                        e.alive = false;
+                        bullets.splice(bi, 1);
+                        spawnParticles(e.x+e.w/2, e.y+e.h/2, e.color);
+                        score += 100;
+                        enemySpeed += 0.05; // Get faster
+                        document.getElementById('score').innerText = score;
+                    }
+                });
+            });
+
+            // Player Hit
+            enemyBullets.forEach(b => {
+                if(b.x > player.x && b.x < player.x + player.w && b.y > player.y && b.y < player.y + player.h) {
+                    gameOver("HULL BREACH DETECTED!");
+                }
+            });
+            // Cleanup Enemy Bullets
+            enemyBullets = enemyBullets.filter(b => b.y < canvas.height);
+
+            // Win Condition
+            if(!enemies.some(e => e.alive)) gameOver("SECTOR CLEARED! YOU WIN.");
+
+            // Particles
+            particles.forEach(p => {
+                p.x += p.vx; p.y += p.vy; p.life -= 0.05;
+            });
+            particles = particles.filter(p => p.life > 0);
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Player
+            ctx.fillStyle = player.color;
+            ctx.shadowBlur = 15; ctx.shadowColor = player.color;
+            ctx.fillRect(player.x, player.y, player.w, player.h);
+            // Turret
+            ctx.fillRect(player.x + 15, player.y - 10, 10, 10);
+            ctx.shadowBlur = 0;
+
+            // Enemies
+            enemies.forEach(e => {
+                if(e.alive) {
+                    ctx.fillStyle = e.color;
+                    ctx.shadowBlur = 5; ctx.shadowColor = e.color;
+                    ctx.fillRect(e.x, e.y, e.w, e.h);
+                    // Eyes
+                    ctx.fillStyle = '#000';
+                    ctx.fillRect(e.x + 5, e.y + 10, 5, 5);
+                    ctx.fillRect(e.x + 20, e.y + 10, 5, 5);
+                    ctx.shadowBlur = 0;
+                }
+            });
+
+            // Bullets
+            ctx.fillStyle = '#fff';
+            bullets.forEach(b => ctx.fillRect(b.x, b.y, b.w, b.h));
+
+            // Enemy Bullets
+            ctx.fillStyle = '#ff0055';
+            ctx.shadowBlur = 10; ctx.shadowColor = '#ff0055';
+            enemyBullets.forEach(b => ctx.fillRect(b.x, b.y, b.w, b.h));
+            ctx.shadowBlur = 0;
+
+            // Particles
+            particles.forEach(p => {
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.fillRect(p.x, p.y, 4, 4);
+            });
+            ctx.globalAlpha = 1.0;
+        }
+
+        // --- TACTICAL AI ---
+        function runAI() {
+            let move = 0;
+            let centerX = player.x + player.w/2;
+
+            // 1. Survival Priority: Dodge Bullets
+            let threateningBullet = null;
+            let minDist = Infinity;
+
+            enemyBullets.forEach(b => {
+                // If bullet is falling towards us and is close
+                if(b.y < player.y && b.y > player.y - 150) { 
+                    if(Math.abs(b.x - centerX) < player.w) { // In our lane
+                        let dist = player.y - b.y;
+                        if(dist < minDist) {
+                            minDist = dist;
+                            threateningBullet = b;
+                        }
+                    }
+                }
+            });
+
+            if(threateningBullet) {
+                // Dodge away from bullet center
+                if(threateningBullet.x < centerX) move = 1; // Move Right
+                else move = -1; // Move Left
+            } else {
+                // 2. Attack Priority: Aim at nearest enemy
+                let target = null;
+                let minTargetDist = Infinity;
+                
+                // Find lowest/closest enemy
+                enemies.forEach(e => {
+                    if(e.alive) {
+                        let d = Math.abs(e.x - centerX);
+                        if(d < minTargetDist) {
+                            minTargetDist = d;
+                            target = e;
+                        }
+                    }
+                });
+
+                if(target) {
+                    if(centerX < target.x + target.w/2 - 10) move = 1;
+                    else if(centerX > target.x + target.w/2 + 10) move = -1;
+                    else {
+                        // Fire!
+                        if(Date.now() - lastShot > 250) {
+                            bullets.push({x: player.x + player.w/2, y: player.y, w: 4, h: 10, color: '#fff'});
+                            lastShot = Date.now();
+                        }
+                    }
+                }
+            }
+
+            // Apply Move
+            if(move === -1 && player.x > 0) player.x -= player.speed;
+            if(move === 1 && player.x < canvas.width - player.w) player.x += player.speed;
+        }
+
+        function toggleAI() {
+            isAI = !isAI;
+            const btn = document.getElementById('aiBtn');
+            if(isAI) {
+                btn.innerText = "DEACTIVATE AI";
+                btn.classList.add('active');
+            } else {
+                btn.innerText = "ACTIVATE TACTICAL AI";
+                btn.classList.remove('active');
+            }
+        }
+
+        // --- SYSTEM ---
+        document.addEventListener('keydown', (e) => {
+            if(e.code === "Space") keys.Space = true;
+            if(e.code === "ArrowLeft") keys.ArrowLeft = true;
+            if(e.code === "ArrowRight") keys.ArrowRight = true;
+        });
+        document.addEventListener('keyup', (e) => {
+            if(e.code === "Space") keys.Space = false;
+            if(e.code === "ArrowLeft") keys.ArrowLeft = false;
+            if(e.code === "ArrowRight") keys.ArrowRight = false;
+        });
+
+        function gameOver(msg) {
+            gameRunning = false;
+            let col = msg.includes("WIN") ? "#00ffea" : "#ff0055";
+            let ico = msg.includes("WIN") ? "success" : "error";
+            Swal.fire({
+                title: msg,
+                background: '#0a0a0a', color: col, icon: ico,
+                confirmButtonText: 'REBOOT',
+                customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title' }
+            }).then(() => startGame());
+        }
+
+        function loop() {
+            if(gameRunning) {
+                update();
+                draw();
+                requestAnimationFrame(loop);
+            }
+        }
+
+        function startGame() {
+            initGame();
+        }
+
+        startGame();
+    </script>
+</body>
+</html>

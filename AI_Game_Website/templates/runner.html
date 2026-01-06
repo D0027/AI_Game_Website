@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEURAL ARENA | Neon Runner</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        /* --- CORE STYLES --- */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: #020202; color: #fff; font-family: 'Rajdhani', sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+            min-height: 100vh; overflow-y: auto; padding-top: 20px; padding-bottom: 50px;
+            user-select: none;
+        }
+        #neural-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; background: radial-gradient(circle at center, #1a1300 0%, #000 100%); }
+        .scanlines { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2)); background-size: 100% 4px; pointer-events: none; z-index: -1; opacity: 0.3; }
+
+        .back-btn { position: absolute; top: 30px; left: 30px; text-decoration: none; color: #ffbf00; font-family: 'Orbitron'; font-size: 1rem; border: 1px solid #ffbf00; padding: 10px 20px; border-radius: 5px; transition: 0.3s; background: rgba(255, 191, 0, 0.1); }
+        .back-btn:hover { background-color: #ffbf00; color: #000; box-shadow: 0 0 25px #ffbf00; }
+
+        h1 { font-family: 'Orbitron'; font-size: 3.5rem; text-shadow: 0 0 20px #ffbf00; color: #ffbf00; margin-bottom: 10px; margin-top: 40px; }
+        .score-board { font-family: 'Orbitron'; font-size: 2rem; margin-bottom: 15px; color: #fff; }
+
+        #gameCanvas {
+            background: rgba(20, 15, 0, 0.8);
+            border: 2px solid #ffbf00;
+            box-shadow: 0 0 40px rgba(255, 191, 0, 0.2);
+            border-radius: 5px;
+        }
+
+        .controls-area { margin-top: 20px; display: flex; gap: 20px; }
+        button {
+            padding: 10px 30px; font-family: 'Orbitron'; font-size: 1rem; color: #000; background: #ffbf00;
+            border: none; cursor: pointer; border-radius: 5px; box-shadow: 0 0 20px #ffbf00; transition: 0.3s;
+        }
+        button:hover { transform: scale(1.1); box-shadow: 0 0 40px #ffbf00; }
+        .btn-ai.active { background: #ff0055; color: #fff; box-shadow: 0 0 20px #ff0055; }
+
+        .instructions { margin-top: 15px; color: #888; font-family: 'Orbitron'; letter-spacing: 1px; font-size: 0.9rem; }
+        .swal-custom-popup { background: #0a0a0a !important; border: 2px solid #ffbf00 !important; }
+        .swal-custom-title { color: #ffbf00 !important; font-family: 'Orbitron' !important; }
+    </style>
+</head>
+<body>
+    <canvas id="neural-bg"></canvas>
+    <div class="scanlines"></div>
+
+    <a href="/" class="back-btn">← DASHBOARD</a>
+    <h1>NEON RUNNER</h1>
+    <div class="score-board">SCORE: <span id="score">0</span></div>
+
+    <canvas id="gameCanvas" width="800" height="400"></canvas>
+
+    <div class="controls-area">
+        <button onclick="startGame()">RESTART SYSTEM</button>
+        <button id="aiBtn" class="btn-ai" onclick="toggleAI()">ACTIVATE AI</button>
+    </div>
+    
+    <div class="instructions">CONTROLS: SPACEBAR, UP ARROW, or CLICK to Jump</div>
+
+    <script>
+        const bgCanvas = document.getElementById('neural-bg'); const bgCtx = bgCanvas.getContext('2d');
+        bgCanvas.width = window.innerWidth; bgCanvas.height = window.innerHeight;
+        let bgParticles=[]; class Particle{constructor(){this.x=Math.random()*bgCanvas.width;this.y=Math.random()*bgCanvas.height;this.size=Math.random()*2;this.speedX=(Math.random()*1.5)-0.75;this.speedY=(Math.random()*1.5)-0.75;this.color='#ffbf00';}update(){this.x+=this.speedX;this.y+=this.speedY;if(this.x<0||this.x>bgCanvas.width)this.speedX*=-1;if(this.y<0||this.y>bgCanvas.height)this.speedY*=-1;}draw(){bgCtx.fillStyle=this.color;bgCtx.beginPath();bgCtx.arc(this.x,this.y,this.size,0,Math.PI*2);bgCtx.fill();}}
+        function initBg(){bgParticles=[];for(let i=0;i<80;i++)bgParticles.push(new Particle());}
+        function animateBg(){bgCtx.clearRect(0,0,bgCanvas.width,bgCanvas.height);for(let i=0;i<bgParticles.length;i++){bgParticles[i].update();bgParticles[i].draw();connect(i);}requestAnimationFrame(animateBg);}
+        function connect(a){for(let b=a;b<bgParticles.length;b++){let dist=((bgParticles[a].x-bgParticles[b].x)**2+(bgParticles[a].y-bgParticles[b].y)**2);if(dist<(bgCanvas.width/7)*(bgCanvas.height/7)){bgCtx.strokeStyle='rgba(255, 191, 0,'+(1-dist/20000)+')';bgCtx.lineWidth=1;bgCtx.beginPath();bgCtx.moveTo(bgParticles[a].x,bgParticles[a].y);bgCtx.lineTo(bgParticles[b].x,bgParticles[b].y);bgCtx.stroke();}}}
+        window.addEventListener('resize',()=>{bgCanvas.width=window.innerWidth;bgCanvas.height=window.innerHeight;initBg();});initBg();animateBg();
+    </script>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Physics
+        const GRAVITY = 0.6;
+        const JUMP_FORCE = -12;
+        const BASE_SPEED = 6;
+        let gameSpeed = BASE_SPEED;
+
+        // Player
+        let player = { x: 50, y: 300, w: 30, h: 50, dy: 0, grounded: true, color: '#ffbf00' };
+        
+        // World
+        let obstacles = [];
+        let particles = [];
+        let score = 0;
+        let frameCount = 0;
+        let gameRunning = true;
+        let isAI = false;
+
+        function initGame() {
+            player = { x: 50, y: 300, w: 30, h: 50, dy: 0, grounded: true, color: '#ffbf00' };
+            obstacles = [];
+            particles = [];
+            score = 0;
+            frameCount = 0;
+            gameSpeed = BASE_SPEED;
+            document.getElementById('score').innerText = 0;
+            gameRunning = true;
+            loop();
+        }
+
+        function jump() {
+            if(player.grounded) {
+                player.dy = JUMP_FORCE;
+                player.grounded = false;
+                spawnJumpParticles();
+            }
+        }
+
+        function spawnJumpParticles() {
+            for(let i=0; i<5; i++){
+                particles.push({
+                    x: player.x + player.w/2, y: player.y + player.h,
+                    vx: (Math.random()-0.5)*4, vy: (Math.random())*2,
+                    life: 1.0, color: '#fff'
+                });
+            }
+        }
+
+        function spawnExplosion(x, y) {
+            for(let i=0; i<15; i++){
+                particles.push({
+                    x: x, y: y,
+                    vx: (Math.random()-0.5)*8, vy: (Math.random()-0.5)*8,
+                    life: 1.0, color: '#ffbf00'
+                });
+            }
+        }
+
+        function spawnObstacle() {
+            let type = Math.random() > 0.5 ? 'BOX' : 'SPIKE';
+            let w = type === 'BOX' ? 30 : 20;
+            let h = type === 'BOX' ? 30 : 40;
+            let y = 350 - h; // Floor is at 350
+            
+            obstacles.push({
+                x: canvas.width, y: y, w: w, h: h,
+                type: type,
+                color: type === 'BOX' ? '#ffbf00' : '#ff0055'
+            });
+        }
+
+        function update() {
+            // Gravity
+            player.dy += GRAVITY;
+            player.y += player.dy;
+
+            // Floor Collision
+            if(player.y + player.h > 350) {
+                player.y = 350 - player.h;
+                player.dy = 0;
+                player.grounded = true;
+            }
+
+            // Speed Increase
+            if(frameCount % 300 === 0) gameSpeed += 0.5;
+
+            // Obstacles
+            // Spawn Rate varies by speed
+            let spawnRate = Math.floor(100 - (gameSpeed * 2));
+            if(spawnRate < 40) spawnRate = 40;
+            
+            if(frameCount % spawnRate === 0 || frameCount === 1) {
+                if(Math.random() > 0.3) spawnObstacle(); // Chance to skip
+            }
+
+            for(let i=0; i<obstacles.length; i++) {
+                let obs = obstacles[i];
+                obs.x -= gameSpeed;
+
+                // Collision
+                if (player.x < obs.x + obs.w &&
+                    player.x + player.w > obs.x &&
+                    player.y < obs.y + obs.h &&
+                    player.y + player.h > obs.y) {
+                        gameOver();
+                }
+            }
+            // Cleanup
+            obstacles = obstacles.filter(o => o.x + o.w > 0);
+
+            // Particles
+            particles.forEach(p => {
+                p.x += p.vx; p.y += p.vy; p.life -= 0.05;
+            });
+            particles = particles.filter(p => p.life > 0);
+
+            // Score
+            score++;
+            document.getElementById('score').innerText = Math.floor(score/10);
+            
+            frameCount++;
+            if(isAI) runAI();
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Floor
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, 350); ctx.lineTo(canvas.width, 350);
+            ctx.stroke();
+
+            // Player
+            ctx.fillStyle = player.color;
+            ctx.shadowBlur = 15; ctx.shadowColor = player.color;
+            ctx.fillRect(player.x, player.y, player.w, player.h);
+            ctx.shadowBlur = 0;
+
+            // Obstacles
+            obstacles.forEach(obs => {
+                ctx.fillStyle = obs.color;
+                ctx.shadowBlur = 10; ctx.shadowColor = obs.color;
+                if(obs.type === 'BOX') {
+                    ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
+                } else {
+                    // Draw Spike
+                    ctx.beginPath();
+                    ctx.moveTo(obs.x, obs.y + obs.h);
+                    ctx.lineTo(obs.x + obs.w/2, obs.y);
+                    ctx.lineTo(obs.x + obs.w, obs.y + obs.h);
+                    ctx.fill();
+                }
+                ctx.shadowBlur = 0;
+            });
+
+            // Particles
+            particles.forEach(p => {
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.fillRect(p.x, p.y, 4, 4);
+            });
+            ctx.globalAlpha = 1.0;
+
+            // AI Visualizer
+            if(isAI && obstacles.length > 0) {
+                // Find next obstacle
+                let nextObs = obstacles.find(o => o.x > player.x);
+                if(nextObs) {
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                    ctx.setLineDash([5, 5]);
+                    ctx.beginPath();
+                    ctx.moveTo(player.x + player.w, player.y + player.h);
+                    ctx.lineTo(nextObs.x, nextObs.y + nextObs.h);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+            }
+        }
+
+        // --- AI LOGIC ---
+        function runAI() {
+            if(!player.grounded) return;
+
+            let nextObs = obstacles.find(o => o.x > player.x);
+            if(nextObs) {
+                let dist = nextObs.x - (player.x + player.w);
+                
+                // Adaptive Jump Threshold
+                // Faster speed = Jump earlier
+                let jumpDist = 90 + (gameSpeed * 4); 
+                
+                if(dist < jumpDist && dist > 0) {
+                    jump();
+                }
+            }
+        }
+
+        function toggleAI() {
+            isAI = !isAI;
+            const btn = document.getElementById('aiBtn');
+            if(isAI) {
+                btn.innerText = "DEACTIVATE AI";
+                btn.classList.add('active');
+            } else {
+                btn.innerText = "ACTIVATE AI";
+                btn.classList.remove('active');
+            }
+        }
+
+        function gameOver() {
+            gameRunning = false;
+            spawnExplosion(player.x, player.y);
+            draw();
+            
+            Swal.fire({
+                title: "COLLISION DETECTED",
+                text: "Structure Compromised.",
+                background: '#0a0a0a', color: '#ffbf00', icon: 'error',
+                confirmButtonText: 'RESTART',
+                customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title' }
+            }).then(() => startGame());
+        }
+
+        function loop() {
+            if(gameRunning) {
+                update();
+                draw();
+                requestAnimationFrame(loop);
+            }
+        }
+
+        function startGame() {
+            initGame();
+        }
+
+        // Inputs
+        document.addEventListener('keydown', (e) => {
+            if((e.code === "Space" || e.code === "ArrowUp") && !isAI) jump();
+        });
+        canvas.addEventListener('mousedown', () => {
+            if(!isAI) jump();
+        });
+
+        startGame();
+    </script>
+</body>
+</html>

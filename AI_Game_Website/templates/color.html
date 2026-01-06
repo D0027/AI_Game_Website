@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEURAL ARENA | Neon Color</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        /* --- CORE STYLES --- */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: #020202; color: #fff; font-family: 'Rajdhani', sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+            min-height: 100vh; overflow-y: auto; padding-top: 20px; padding-bottom: 50px;
+            user-select: none;
+        }
+        #neural-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; background: radial-gradient(circle at center, #1a1a1a 0%, #000 100%); }
+        .scanlines { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2)); background-size: 100% 4px; pointer-events: none; z-index: -1; opacity: 0.3; }
+
+        .back-btn { position: absolute; top: 30px; left: 30px; text-decoration: none; color: #fff; font-family: 'Orbitron'; font-size: 1rem; border: 1px solid #fff; padding: 10px 20px; border-radius: 5px; transition: 0.3s; background: rgba(255, 255, 255, 0.1); }
+        .back-btn:hover { background-color: #fff; color: #000; box-shadow: 0 0 25px #fff; }
+
+        h1 { font-family: 'Orbitron'; font-size: 3.5rem; text-shadow: 0 0 20px #fff; color: #fff; margin-bottom: 30px; margin-top: 40px; }
+
+        #colorCanvas {
+            background: rgba(20, 20, 20, 0.9);
+            border: 2px solid #fff;
+            box-shadow: 0 0 40px rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .controls-area { margin-top: 30px; display: flex; gap: 20px; }
+        button {
+            padding: 10px 30px; font-family: 'Orbitron'; font-size: 1rem; color: #000; background: #fff;
+            border: none; cursor: pointer; border-radius: 5px; box-shadow: 0 0 20px #fff; transition: 0.3s;
+        }
+        button:hover { transform: scale(1.1); box-shadow: 0 0 40px #fff; }
+        .btn-guide { background: transparent; border: 2px solid #fff; color: #fff; }
+        .btn-guide:hover { background: #fff; color: #000; }
+
+        .swal-custom-popup { background: #0a0a0a !important; border: 2px solid #fff !important; }
+        .swal-custom-title { color: #fff !important; font-family: 'Orbitron' !important; }
+        .swal-custom-content { color: #ccc !important; font-family: 'Rajdhani' !important; font-size: 1.1rem; text-align: left;}
+    </style>
+</head>
+<body>
+    <canvas id="neural-bg"></canvas>
+    <div class="scanlines"></div>
+
+    <a href="/" class="back-btn">← DASHBOARD</a>
+    <h1>NEON COLOR</h1>
+
+    <canvas id="colorCanvas" width="800" height="500"></canvas>
+
+    <div class="controls-area">
+        <button class="btn-guide" onclick="showGuide()">MISSION BRIEF</button>
+        <button class="btn-guide" onclick="initGraph()">SCRAMBLE GRAPH</button>
+        <button onclick="runAI()">AI AUTO-PAINT</button>
+    </div>
+
+    <script>
+        const bgCanvas = document.getElementById('neural-bg'); const bgCtx = bgCanvas.getContext('2d');
+        bgCanvas.width = window.innerWidth; bgCanvas.height = window.innerHeight;
+        let particles=[]; class Particle{constructor(){this.x=Math.random()*bgCanvas.width;this.y=Math.random()*bgCanvas.height;this.size=Math.random()*2;this.speedX=(Math.random()*1.0)-0.5;this.speedY=(Math.random()*1.0)-0.5;this.color='#fff';}update(){this.x+=this.speedX;this.y+=this.speedY;if(this.x<0||this.x>bgCanvas.width)this.speedX*=-1;if(this.y<0||this.y>bgCanvas.height)this.speedY*=-1;}draw(){bgCtx.fillStyle=this.color;bgCtx.beginPath();bgCtx.arc(this.x,this.y,this.size,0,Math.PI*2);bgCtx.fill();}}
+        function initBg(){particles=[];for(let i=0;i<60;i++)particles.push(new Particle());}
+        function animateBg(){bgCtx.clearRect(0,0,bgCanvas.width,bgCanvas.height);for(let i=0;i<particles.length;i++){particles[i].update();particles[i].draw();connect(i);}requestAnimationFrame(animateBg);}
+        function connect(a){for(let b=a;b<particles.length;b++){let dist=((particles[a].x-particles[b].x)**2+(particles[a].y-particles[b].y)**2);if(dist<(bgCanvas.width/7)*(bgCanvas.height/7)){bgCtx.strokeStyle='rgba(255, 255, 255,'+(1-dist/25000)+')';bgCtx.lineWidth=1;bgCtx.beginPath();bgCtx.moveTo(particles[a].x,particles[a].y);bgCtx.lineTo(particles[b].x,particles[b].y);bgCtx.stroke();}}}
+        window.addEventListener('resize',()=>{bgCanvas.width=window.innerWidth;bgCanvas.height=window.innerHeight;initBg();});initBg(); animateBg();
+    </script>
+
+    <script>
+        const canvas = document.getElementById('colorCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Colors: Empty (0), then Red, Green, Blue, Yellow, Cyan, Magenta
+        const PALETTE = ['#333', '#ff0000', '#00ff00', '#0000ff', '#ffff00', '#00ffff', '#ff00ff'];
+        
+        let nodes = [];
+        let edges = [];
+        
+        function initGraph() {
+            nodes = [];
+            edges = [];
+            
+            // Generate Nodes
+            for(let i=0; i<10; i++) {
+                nodes.push({
+                    id: i,
+                    x: Math.random() * (canvas.width - 100) + 50,
+                    y: Math.random() * (canvas.height - 100) + 50,
+                    colorIdx: 0
+                });
+            }
+            
+            // Connect randomly (Geometric Graph: connect if close)
+            for(let i=0; i<nodes.length; i++) {
+                for(let j=i+1; j<nodes.length; j++) {
+                    let d = Math.hypot(nodes[i].x - nodes[j].x, nodes[i].y - nodes[j].y);
+                    if(d < 250 && Math.random() > 0.4) {
+                        edges.push({source: i, target: j});
+                    }
+                }
+            }
+            draw();
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw Edges
+            edges.forEach(e => {
+                let n1 = nodes[e.source];
+                let n2 = nodes[e.target];
+                
+                // Conflict Check
+                let isConflict = (n1.colorIdx !== 0 && n1.colorIdx === n2.colorIdx);
+                
+                ctx.beginPath();
+                ctx.lineWidth = isConflict ? 4 : 2;
+                ctx.strokeStyle = isConflict ? "#ff0000" : "#555";
+                
+                if(isConflict) { ctx.shadowBlur = 15; ctx.shadowColor = "#ff0000"; }
+                
+                ctx.moveTo(n1.x, n1.y);
+                ctx.lineTo(n2.x, n2.y);
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+            });
+
+            // Draw Nodes
+            nodes.forEach(n => {
+                ctx.beginPath();
+                ctx.arc(n.x, n.y, 15, 0, Math.PI*2);
+                ctx.fillStyle = PALETTE[n.colorIdx];
+                ctx.shadowBlur = 15; ctx.shadowColor = PALETTE[n.colorIdx];
+                if(n.colorIdx === 0) ctx.shadowBlur = 0; // No glow for empty
+                ctx.fill();
+                
+                ctx.strokeStyle = "#fff";
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+            });
+        }
+
+        // --- INTERACTIVITY ---
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            
+            for(let n of nodes) {
+                let d = Math.hypot(n.x - mouseX, n.y - mouseY);
+                if(d < 20) {
+                    // Manual Paint: Cycle colors
+                    n.colorIdx = (n.colorIdx + 1) % PALETTE.length;
+                    if(n.colorIdx === 0) n.colorIdx = 1; // Skip empty on cycle
+                    draw();
+                    checkWin();
+                    return;
+                }
+            }
+        });
+
+        function checkWin() {
+            let conflict = false;
+            let full = true;
+            
+            for(let n of nodes) if(n.colorIdx === 0) full = false;
+            
+            for(let e of edges) {
+                if(nodes[e.source].colorIdx === nodes[e.target].colorIdx && nodes[e.source].colorIdx !== 0) {
+                    conflict = true;
+                }
+            }
+            
+            if(full && !conflict) {
+                Swal.fire({
+                    title: "GRAPH STABILIZED",
+                    text: "Perfect chromatic resonance achieved.",
+                    background: '#0a0a0a', color: '#fff', icon: 'success',
+                    timer: 1500, showConfirmButton: false,
+                    customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title' }
+                });
+            }
+        }
+
+        function runAI() {
+            fetch('/solve_color', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ nodes: nodes, edges: edges })
+            })
+            .then(res => res.json())
+            .then(data => {
+                let colorMap = data.colors;
+                
+                // Animate filling
+                let keys = Object.keys(colorMap);
+                let i = 0;
+                
+                function paintNext() {
+                    if(i >= keys.length) {
+                        checkWin();
+                        return;
+                    }
+                    let nid = parseInt(keys[i]);
+                    // Map AI color index (0-based) to Palette (1-based to skip grey)
+                    // AI returns 0,1,2.. we map to 1,2,3..
+                    nodes[nid].colorIdx = (colorMap[nid] % (PALETTE.length - 1)) + 1;
+                    draw();
+                    i++;
+                    setTimeout(paintNext, 100);
+                }
+                paintNext();
+            });
+        }
+
+        function showGuide() {
+            Swal.fire({
+                title: 'MISSION BRIEF',
+                html: `
+                    <ul style="list-style: none; padding: 0; text-align: left;">
+                        <li style="margin-bottom: 10px;">► <strong>GOAL:</strong> Assign colors so that NO two connected nodes share the same color.</li>
+                        <li style="margin-bottom: 10px;">► <strong>MANUAL MODE:</strong> Click nodes to cycle colors. Wires turn RED if there is a conflict.</li>
+                        <li style="margin-bottom: 10px;">► <strong>AI ASSIST:</strong> Uses a <strong>Greedy Coloring Algorithm</strong> to find a valid solution using minimal colors.</li>
+                    </ul>
+                `,
+                background: '#0a0a0a', color: '#fff',
+                confirmButtonText: 'ACKNOWLEDGED',
+                confirmButtonColor: '#fff',
+                customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title', content: 'swal-custom-content' }
+            });
+        }
+
+        initGraph();
+    </script>
+</body>
+</html>

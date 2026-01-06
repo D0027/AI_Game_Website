@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEURAL ARENA | Neon Pong</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        /* --- CORE STYLES --- */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: #020202; color: #fff; font-family: 'Rajdhani', sans-serif;
+            display: flex; flex-direction: column; align-items: center; 
+            /* FIX: Changed justify-content to flex-start so top doesn't get cut off */
+            justify-content: flex-start; 
+            min-height: 100vh; 
+            /* FIX: Allow scrolling if screen is too small */
+            overflow-y: auto; 
+            overflow-x: hidden;
+            padding-top: 20px;
+            padding-bottom: 50px; /* FIX: Space for bottom text */
+        }
+        #neural-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; background: radial-gradient(circle at center, #0a0a0a 0%, #000 100%); }
+        .scanlines { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2)); background-size: 100% 4px; pointer-events: none; z-index: -1; opacity: 0.3; }
+
+        .back-btn { position: absolute; top: 30px; left: 30px; text-decoration: none; color: #aa00ff; font-family: 'Orbitron'; font-size: 1rem; border: 1px solid #aa00ff; padding: 10px 20px; border-radius: 5px; transition: 0.3s; background: rgba(170, 0, 255, 0.1); }
+        .back-btn:hover { background-color: #aa00ff; color: #000; box-shadow: 0 0 25px #aa00ff; }
+
+        h1 { font-family: 'Orbitron'; font-size: 3.5rem; text-shadow: 0 0 20px #aa00ff; color: #aa00ff; margin-bottom: 5px; margin-top: 40px; }
+        
+        /* NEW NOTICE STYLE */
+        .notice {
+            font-family: 'Orbitron'; font-size: 1.2rem; color: #fff; letter-spacing: 3px;
+            margin-bottom: 25px; text-shadow: 0 0 10px #aa00ff; opacity: 0.8;
+            border-bottom: 1px solid #aa00ff; padding-bottom: 5px;
+        }
+
+        /* SCOREBOARD */
+        .score-board {
+            display: flex; gap: 50px; font-family: 'Orbitron'; font-size: 3rem; font-weight: bold;
+            margin-bottom: 20px; text-shadow: 0 0 10px currentColor;
+        }
+        .p-score { color: #00ffcc; }
+        .ai-score { color: #ff0055; }
+
+        /* GAME CANVAS */
+        canvas {
+            background: rgba(20, 20, 20, 0.8);
+            border: 2px solid #aa00ff;
+            box-shadow: 0 0 50px rgba(170, 0, 255, 0.3);
+            border-radius: 10px;
+            cursor: none; /* Hide cursor inside game */
+        }
+
+        #controls { margin-top: 20px; color: #888; font-family: 'Orbitron'; letter-spacing: 1px; margin-bottom: 20px; }
+        
+        .swal-custom-popup { background: #0a0a0a !important; border: 2px solid #aa00ff !important; }
+        .swal-custom-title { color: #aa00ff !important; font-family: 'Orbitron' !important; }
+    </style>
+</head>
+<body>
+    <canvas id="neural-bg"></canvas>
+    <div class="scanlines"></div>
+
+    <a href="/" class="back-btn">← DASHBOARD</a>
+    
+    <h1>NEON PONG</h1>
+    <div class="notice">FIRST TO 5 WINS</div>
+    
+    <div class="score-board">
+        <div class="p-score" id="playerScore">0</div>
+        <div>-</div>
+        <div class="ai-score" id="aiScore">0</div>
+    </div>
+
+    <canvas id="gameCanvas" width="800" height="500"></canvas>
+
+    <div id="controls">USE MOUSE TO CONTROL PADDLE</div>
+
+    <script>
+        const bgCanvas = document.getElementById('neural-bg'); const bgCtx = bgCanvas.getContext('2d');
+        bgCanvas.width = window.innerWidth; bgCanvas.height = window.innerHeight;
+        let bgParticlesArray; 
+        class BgParticle { constructor() { this.x = Math.random() * bgCanvas.width; this.y = Math.random() * bgCanvas.height; this.size = Math.random() * 2; this.speedX = (Math.random() * 1.5) - 0.75; this.speedY = (Math.random() * 1.5) - 0.75; this.color = '#aa00ff'; } update() { this.x += this.speedX; this.y += this.speedY; if (this.x < 0 || this.x > bgCanvas.width) this.speedX *= -1; if (this.y < 0 || this.y > bgCanvas.height) this.speedY *= -1; } draw() { bgCtx.fillStyle = this.color; bgCtx.beginPath(); bgCtx.arc(this.x, this.y, this.size, 0, Math.PI * 2); bgCtx.fill(); } }
+        function initBg() { bgParticlesArray = []; let numberOfParticles = (bgCanvas.height * bgCanvas.width) / 15000; for (let i = 0; i < numberOfParticles; i++) { bgParticlesArray.push(new BgParticle()); } }
+        function animateBg() { bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height); for (let i = 0; i < bgParticlesArray.length; i++) { bgParticlesArray[i].update(); bgParticlesArray[i].draw(); connectBg(i); } requestAnimationFrame(animateBg); }
+        function connectBg(a) { for (let b = a; b < bgParticlesArray.length; b++) { let distance = ((bgParticlesArray[a].x - bgParticlesArray[b].x) * (bgParticlesArray[a].x - bgParticlesArray[b].x)) + ((bgParticlesArray[a].y - bgParticlesArray[b].y) * (bgParticlesArray[a].y - bgParticlesArray[b].y)); if (distance < (bgCanvas.width/9) * (bgCanvas.height/9)) { let opacityValue = 0.8 - (distance / 20000); bgCtx.strokeStyle = 'rgba(170, 0, 255,' + opacityValue + ')'; bgCtx.lineWidth = 1; bgCtx.beginPath(); bgCtx.moveTo(bgParticlesArray[a].x, bgParticlesArray[a].y); bgCtx.lineTo(bgParticlesArray[b].x, bgParticlesArray[b].y); bgCtx.stroke(); } } }
+        window.addEventListener('resize', () => { bgCanvas.width = window.innerWidth; bgCanvas.height = window.innerHeight; initBg(); }); initBg(); animateBg();
+    </script>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Game Objects
+        let ball = { x: 400, y: 250, radius: 8, speed: 7, dx: 5, dy: 5, color: '#fff' };
+        const paddleWidth = 10, paddleHeight = 100;
+        const player = { x: 0, y: 200, score: 0, color: '#00ffcc' };
+        const ai = { x: canvas.width - paddleWidth, y: 200, score: 0, speed: 4.5, color: '#ff0055' };
+        
+        let trail = [];
+        let hitSparks = [];
+
+        function drawRect(x, y, w, h, color) {
+            ctx.fillStyle = color;
+            ctx.shadowBlur = 20; ctx.shadowColor = color;
+            ctx.fillRect(x, y, w, h);
+            ctx.shadowBlur = 0;
+        }
+
+        function drawCircle(x, y, r, color) {
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(x, y, r, 0, Math.PI * 2, false);
+            ctx.fill();
+        }
+
+        function drawTrail() {
+            for(let i=0; i<trail.length; i++) {
+                let opacity = i / trail.length;
+                ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+                ctx.beginPath();
+                ctx.arc(trail[i].x, trail[i].y, ball.radius * (i/trail.length), 0, Math.PI*2);
+                ctx.fill();
+            }
+        }
+
+        function createSparks(x, y, color) {
+            for(let i=0; i<15; i++) {
+                hitSparks.push({
+                    x: x, y: y,
+                    dx: (Math.random() - 0.5) * 10,
+                    dy: (Math.random() - 0.5) * 10,
+                    life: 1.0,
+                    color: color
+                });
+            }
+        }
+
+        function drawSparks() {
+            for(let i=0; i<hitSparks.length; i++) {
+                let s = hitSparks[i];
+                ctx.fillStyle = `rgba(${s.color === '#00ffcc' ? '0, 255, 204' : '255, 0, 85'}, ${s.life})`;
+                ctx.beginPath();
+                ctx.arc(s.x, s.y, 3, 0, Math.PI*2);
+                ctx.fill();
+                s.x += s.dx; s.y += s.dy; s.life -= 0.05;
+            }
+            hitSparks = hitSparks.filter(s => s.life > 0);
+        }
+
+        function drawNet() {
+            for (let i = 0; i <= canvas.height; i += 30) {
+                drawRect(canvas.width / 2 - 1, i, 2, 20, "#333");
+            }
+        }
+
+        function resetBall() {
+            ball.x = canvas.width / 2;
+            ball.y = canvas.height / 2;
+            ball.speed = 7;
+            let dirX = Math.random() > 0.5 ? 1 : -1;
+            let dirY = Math.random() > 0.5 ? 1 : -1;
+            ball.dx = dirX * ball.speed;
+            ball.dy = dirY * ball.speed;
+            trail = [];
+        }
+
+        function update() {
+            if(ball.dx === 0 && ball.dy === 0) return;
+
+            ball.x += ball.dx;
+            ball.y += ball.dy;
+
+            trail.push({x: ball.x, y: ball.y});
+            if(trail.length > 20) trail.shift();
+
+            if (ball.y + ball.radius > canvas.height || ball.y - ball.radius < 0) {
+                ball.dy = -ball.dy;
+            }
+
+            let playerPaddle = (ball.x < canvas.width / 2) ? player : ai;
+            
+            if (collision(ball, playerPaddle)) {
+                let collidePoint = (ball.y - (playerPaddle.y + paddleHeight / 2));
+                collidePoint = collidePoint / (paddleHeight / 2);
+                let angleRad = (Math.PI / 4) * collidePoint;
+                let direction = (ball.x < canvas.width / 2) ? 1 : -1;
+                ball.dx = direction * ball.speed * Math.cos(angleRad);
+                ball.dy = ball.speed * Math.sin(angleRad);
+                ball.speed += 0.5;
+                
+                createSparks(ball.x, ball.y, playerPaddle.color);
+                canvas.style.borderColor = playerPaddle.color;
+                setTimeout(() => canvas.style.borderColor = '#aa00ff', 100);
+            }
+
+            let targetY = ball.y - paddleHeight/2;
+            if(targetY > ai.y) ai.y += ai.speed;
+            if(targetY < ai.y) ai.y -= ai.speed;
+            if(ai.y < 0) ai.y = 0;
+            if(ai.y + paddleHeight > canvas.height) ai.y = canvas.height - paddleHeight;
+
+            if (ball.x - ball.radius < 0) {
+                ai.score++;
+                document.getElementById('aiScore').innerText = ai.score;
+                checkWin();
+                if(ball.dx !== 0) resetBall();
+            } else if (ball.x + ball.radius > canvas.width) {
+                player.score++;
+                document.getElementById('playerScore').innerText = player.score;
+                checkWin();
+                if(ball.dx !== 0) resetBall();
+            }
+        }
+
+        function collision(b, p) {
+            b.top = b.y - b.radius;
+            b.bottom = b.y + b.radius;
+            b.left = b.x - b.radius;
+            b.right = b.x + b.radius;
+            p.top = p.y;
+            p.bottom = p.y + paddleHeight;
+            p.left = p.x;
+            p.right = p.x + paddleWidth;
+            return b.right > p.left && b.bottom > p.top && b.left < p.right && b.top < p.bottom;
+        }
+
+        function draw() {
+            ctx.fillStyle = "#000";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            drawNet();
+            drawTrail();
+            drawSparks();
+            drawCircle(ball.x, ball.y, ball.radius, ball.color);
+            drawRect(player.x, player.y, paddleWidth, paddleHeight, player.color);
+            drawRect(ai.x, ai.y, paddleWidth, paddleHeight, ai.color);
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        canvas.addEventListener("mousemove", (evt) => {
+            let rect = canvas.getBoundingClientRect();
+            player.y = evt.clientY - rect.top - paddleHeight / 2;
+            if(player.y < 0) player.y = 0;
+            if(player.y + paddleHeight > canvas.height) player.y = canvas.height - paddleHeight;
+        });
+
+        function checkWin() {
+            if(player.score >= 5 || ai.score >= 5) {
+                let msg = player.score >= 5 ? "YOU WIN!" : "AI WINS!";
+                let col = player.score >= 5 ? "#00ffcc" : "#ff0055";
+                let ico = player.score >= 5 ? "success" : "error";
+                ball.dx = 0; ball.dy = 0; 
+                
+                Swal.fire({
+                    title: msg,
+                    background: '#0a0a0a', color: col, icon: ico,
+                    confirmButtonText: 'RESTART',
+                    customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title' }
+                }).then(() => {
+                    player.score = 0; ai.score = 0;
+                    document.getElementById('playerScore').innerText = 0;
+                    document.getElementById('aiScore').innerText = 0;
+                    resetBall();
+                });
+            }
+        }
+
+        gameLoop();
+    </script>
+</body>
+</html>
