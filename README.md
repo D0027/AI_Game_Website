@@ -1,5 +1,6 @@
 # AI_Game_Website
 "Neural Arena is an interactive AI simulation hub featuring 35+ classic games powered by Python backend algorithms. It showcases real-time implementation of Minimax, A* Pathfinding, and Genetic Algorithms within a responsive, cyberpunk-styled command center."
+
 <div align="center">
 
   <h1>🧠 NEURAL ARENA ⚡</h1>
@@ -85,7 +86,8 @@ This project visualizes complex theoretical concepts through gameplay:
 
 > *The Command Deck Interface*
 >
-> *(Place your screenshot of the Game Grid here)*
+> <img width="1897" height="901" alt="deepak-ai" src="https://github.com/user-attachments/assets/7e5599dd-a218-4cb3-8d90-8a19ecb31e71" /> 
+
 
 ---
 
@@ -137,3 +139,4 @@ If you want to clone the Neural Arena to your local machine:
 
 ---
 <p align="center">Made with 💻 and ☕ by Deepak. <br> <em>System Offline.</em></p>
+
