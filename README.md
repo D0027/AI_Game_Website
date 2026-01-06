@@ -21,7 +21,7 @@
     Featuring <strong>35+ interactive games</strong> powered by core Computer Science algorithms like <strong>Minimax, A*, and Genetic Evolution</strong>.
   </p>
 
-  <h3>🚀 <a href="https://deepakyadav027.pythonanywhere.com">LAUNCH NEURAL ARENA</a> 🚀</h3>
+  <h3>🚀 <a href="https://https://deepakai.pythonanywhere.com/">LAUNCH NEURAL ARENA</a> 🚀</h3>
   
   <br>
 </div>
