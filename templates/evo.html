@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEURAL ARENA | Neon Evo</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        /* --- CORE STYLES --- */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: #020202; color: #fff; font-family: 'Rajdhani', sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+            min-height: 100vh; overflow-y: auto; padding-top: 20px; padding-bottom: 50px;
+            user-select: none;
+        }
+        #neural-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; background: radial-gradient(circle at center, #1a001a 0%, #000 100%); }
+        .scanlines { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2)); background-size: 100% 4px; pointer-events: none; z-index: -1; opacity: 0.3; }
+
+        .back-btn { position: absolute; top: 30px; left: 30px; text-decoration: none; color: #bf00ff; font-family: 'Orbitron'; font-size: 1rem; border: 1px solid #bf00ff; padding: 10px 20px; border-radius: 5px; transition: 0.3s; background: rgba(191, 0, 255, 0.1); }
+        .back-btn:hover { background-color: #bf00ff; color: #fff; box-shadow: 0 0 25px #bf00ff; }
+
+        h1 { font-family: 'Orbitron'; font-size: 3.5rem; text-shadow: 0 0 20px #bf00ff; color: #bf00ff; margin-bottom: 30px; margin-top: 40px; }
+
+        /* EVO UI */
+        .input-group { margin-bottom: 30px; display: flex; gap: 10px; z-index: 10; }
+        input {
+            background: #111; border: 1px solid #bf00ff; color: #fff;
+            padding: 10px 20px; font-family: 'Orbitron'; font-size: 1.2rem;
+            text-transform: uppercase; width: 300px; text-align: center;
+        }
+        
+        .main-display {
+            background: rgba(20, 0, 30, 0.8);
+            border: 2px solid #bf00ff;
+            padding: 40px; border-radius: 10px;
+            text-align: center; width: 80%; max-width: 800px;
+            box-shadow: 0 0 40px rgba(191, 0, 255, 0.2);
+            margin-bottom: 20px;
+        }
+
+        #best-match {
+            font-family: 'Orbitron'; font-size: 3rem; letter-spacing: 5px;
+            color: #fff; text-shadow: 0 0 15px #bf00ff;
+            min-height: 60px;
+            word-break: break-all;
+        }
+
+        .stats-row {
+            display: flex; justify-content: space-around; margin-top: 20px;
+            font-size: 1.2rem; color: #aaa; border-top: 1px solid #333; padding-top: 15px;
+        }
+        .stat-val { color: #bf00ff; font-weight: bold; }
+
+        /* Population Stream */
+        .population-stream {
+            display: flex; flex-wrap: wrap; justify-content: center; gap: 10px;
+            width: 90%; max-width: 1000px; height: 200px; overflow: hidden;
+            opacity: 0.5; font-family: monospace; color: #aaa;
+            mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
+        }
+        .pop-item { font-size: 0.9rem; }
+
+        .controls-area { margin-top: 20px; display: flex; gap: 20px; }
+        button {
+            padding: 10px 30px; font-family: 'Orbitron'; font-size: 1rem; color: #fff; background: #bf00ff;
+            border: none; cursor: pointer; border-radius: 5px; box-shadow: 0 0 20px #bf00ff; transition: 0.3s;
+        }
+        button:hover { transform: scale(1.1); box-shadow: 0 0 40px #bf00ff; }
+        .btn-guide { background: transparent; border: 2px solid #bf00ff; color: #bf00ff; }
+        .btn-guide:hover { background: #bf00ff; color: #fff; }
+
+        .swal-custom-popup { background: #0a0a0a !important; border: 2px solid #bf00ff !important; }
+        .swal-custom-title { color: #bf00ff !important; font-family: 'Orbitron' !important; }
+        .swal-custom-content { color: #ccc !important; font-family: 'Rajdhani' !important; font-size: 1.1rem; text-align: left;}
+    </style>
+</head>
+<body>
+    <canvas id="neural-bg"></canvas>
+    <div class="scanlines"></div>
+
+    <a href="/" class="back-btn">← DASHBOARD</a>
+    <h1>NEON EVO</h1>
+
+    <div class="input-group">
+        <input type="text" id="targetPhrase" value="NEURAL ARENA" maxlength="20">
+        <button onclick="startEvolution()">EVOLVE</button>
+    </div>
+
+    <div class="main-display">
+        <div id="best-match">Waiting for DNA...</div>
+        <div class="stats-row">
+            <div>GENERATION: <span id="gen" class="stat-val">0</span></div>
+            <div>FITNESS: <span id="fit" class="stat-val">0%</span></div>
+            <div>POPULATION: <span class="stat-val">100</span></div>
+        </div>
+    </div>
+
+    <div class="population-stream" id="popStream"></div>
+
+    <div class="controls-area">
+        <button class="btn-guide" onclick="showGuide()">MISSION BRIEF</button>
+        <button class="btn-guide" onclick="location.reload()">RESET LAB</button>
+    </div>
+
+    <script>
+        const bgCanvas = document.getElementById('neural-bg'); const bgCtx = bgCanvas.getContext('2d');
+        bgCanvas.width = window.innerWidth; bgCanvas.height = window.innerHeight;
+        let particles=[]; class Particle{constructor(){this.x=Math.random()*bgCanvas.width;this.y=Math.random()*bgCanvas.height;this.size=Math.random()*2;this.speedX=(Math.random()*1.0)-0.5;this.speedY=(Math.random()*1.0)-0.5;this.color='#bf00ff';}update(){this.x+=this.speedX;this.y+=this.speedY;if(this.x<0||this.x>bgCanvas.width)this.speedX*=-1;if(this.y<0||this.y>bgCanvas.height)this.speedY*=-1;}draw(){bgCtx.fillStyle=this.color;bgCtx.beginPath();bgCtx.arc(this.x,this.y,this.size,0,Math.PI*2);bgCtx.fill();}}
+        function initBg(){particles=[];for(let i=0;i<60;i++)particles.push(new Particle());}
+        function animateBg(){bgCtx.clearRect(0,0,bgCanvas.width,bgCanvas.height);for(let i=0;i<particles.length;i++){particles[i].update();particles[i].draw();connect(i);}requestAnimationFrame(animateBg);}
+        function connect(a){for(let b=a;b<particles.length;b++){let dist=((particles[a].x-particles[b].x)**2+(particles[a].y-particles[b].y)**2);if(dist<(bgCanvas.width/7)*(bgCanvas.height/7)){bgCtx.strokeStyle='rgba(191, 0, 255,'+(1-dist/25000)+')';bgCtx.lineWidth=1;bgCtx.beginPath();bgCtx.moveTo(particles[a].x,particles[a].y);bgCtx.lineTo(particles[b].x,particles[b].y);bgCtx.stroke();}}}
+        window.addEventListener('resize',()=>{bgCanvas.width=window.innerWidth;bgCanvas.height=window.innerHeight;initBg();});initBg(); animateBg();
+    </script>
+
+    <script>
+        let population = [];
+        let target = "";
+        let generation = 0;
+        let isRunning = false;
+        const POP_SIZE = 100;
+        const CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ ";
+
+        function randomString(len) {
+            let res = "";
+            for(let i=0; i<len; i++) res += CHARS.charAt(Math.floor(Math.random() * CHARS.length));
+            return res;
+        }
+
+        function startEvolution() {
+            if(isRunning) return;
+            
+            let input = document.getElementById('targetPhrase');
+            target = input.value.toUpperCase();
+            if(target.trim() === "") target = "NEURAL ARENA";
+            input.value = target;
+            
+            // Init Population
+            population = [];
+            for(let i=0; i<POP_SIZE; i++) population.push(randomString(target.length));
+            
+            generation = 0;
+            isRunning = true;
+            loop();
+        }
+
+        function loop() {
+            if(!isRunning) return;
+
+            fetch('/solve_evo', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ target: target, population: population })
+            })
+            .then(res => res.json())
+            .then(data => {
+                population = data.population;
+                let best = data.best;
+                let fitness = data.fitness;
+                
+                // Update UI
+                document.getElementById('best-match').innerText = best;
+                document.getElementById('gen').innerText = generation;
+                document.getElementById('fit').innerText = fitness.toFixed(1) + "%";
+                
+                // Visualization
+                let stream = document.getElementById('popStream');
+                stream.innerHTML = population.slice(0, 30).map(s => `<div class="pop-item">${s}</div>`).join('');
+
+                if(fitness >= 100) {
+                    isRunning = false;
+                    Swal.fire({
+                        title: "EVOLUTION COMPLETE",
+                        text: `Target reached in ${generation} generations.`,
+                        background: '#0a0a0a', color: '#bf00ff', icon: 'success',
+                        customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title' }
+                    });
+                } else {
+                    generation++;
+                    requestAnimationFrame(loop); // Fixed syntax error here
+                }
+            });
+        }
+
+        function showGuide() {
+            Swal.fire({
+                title: 'MISSION BRIEF',
+                html: `
+                    <ul style="list-style: none; padding: 0; text-align: left;">
+                        <li style="margin-bottom: 10px;">► <strong>GOAL:</strong> Evolve random noise into a specific target phrase.</li>
+                        <li style="margin-bottom: 10px;">► <strong>PROCESS:</strong> 
+                            <br>1. <strong>Selection:</strong> The strings closest to the target survive.
+                            <br>2. <strong>Crossover:</strong> Survivors combine DNA (characters).
+                            <br>3. <strong>Mutation:</strong> Random changes introduce new traits.
+                        </li>
+                    </ul>
+                `,
+                background: '#0a0a0a', color: '#bf00ff',
+                confirmButtonText: 'ACKNOWLEDGED',
+                confirmButtonColor: '#bf00ff',
+                customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title', content: 'swal-custom-content' }
+            });
+        }
+    </script>
+
+<!-- ═══════════════════════════════════════════════
+     NEURAL ARENA — UNIVERSAL ENHANCEMENTS v1.0
+     1) Page Transition  2) Btn Particle Burst
+     3) UI Sounds        4) Achievement System
+═══════════════════════════════════════════════ -->
+<div id="na-transition-overlay" style="
+  position:fixed;inset:0;z-index:999999;
+  background:#000;opacity:0;pointer-events:none;
+  transition:opacity .3s ease;
+"></div>
+
+<div id="na-achievement-toast" style="
+  position:fixed;bottom:28px;right:28px;z-index:999998;
+  background:rgba(0,0,0,.92);border:1px solid var(--ac,#00ffcc);
+  border-radius:8px;padding:12px 18px;font-family:'Orbitron',monospace;
+  font-size:.72rem;color:var(--ac,#00ffcc);letter-spacing:2px;
+  box-shadow:0 0 24px var(--ac,#00ffcc);
+  opacity:0;transform:translateY(16px);
+  transition:opacity .35s,transform .35s;pointer-events:none;
+  display:flex;align-items:center;gap:10px;
+"></div>
+
+<script>
+(function(){
+'use strict';
+
+/* ── 0. Detect accent colour from back-btn ─────────────────────────── */
+const accentDetect = () => {
+  const bb = document.querySelector('.back-btn');
+  if(!bb) return '#00ffcc';
+  const s = getComputedStyle(bb);
+  return s.color || '#00ffcc';
+};
+const ACCENT = accentDetect();
+document.documentElement.style.setProperty('--ac', ACCENT);
+
+/* ── 1. PAGE TRANSITION ────────────────────────────────────────────── */
+const overlay = document.getElementById('na-transition-overlay');
+overlay.style.borderColor = ACCENT;
+
+function navigateWithTransition(href){
+  if(!href || href === '#') return;
+  overlay.style.pointerEvents = 'all';
+  overlay.style.opacity = '1';
+  setTimeout(() => { window.location.href = href; }, 310);
+}
+
+// Intercept back-btn clicks
+document.addEventListener('click', e => {
+  const btn = e.target.closest('.back-btn');
+  if(btn && btn.href){
+    e.preventDefault();
+    playWhoosh();
+    navigateWithTransition(btn.href);
+  }
+}, true);
+
+// Fade-in on arrival
+window.addEventListener('DOMContentLoaded', () => {
+  overlay.style.transition = 'none';
+  overlay.style.opacity = '1';
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      overlay.style.transition = 'opacity .35s ease';
+      overlay.style.opacity = '0';
+    });
+  });
+});
+
+/* ── 2. BACK-BTN HOVER PARTICLE BURST ──────────────────────────────── */
+const bgCv = document.getElementById('neural-bg');
+
+function spawnBurstParticle(x, y){
+  if(!bgCv) return;
+  const angle = Math.random() * Math.PI * 2;
+  const speed = 2 + Math.random() * 3.5;
+  const life  = { v: 1 };
+  const px = x - bgCv.getBoundingClientRect().left;
+  const py = y - bgCv.getBoundingClientRect().top;
+  let vx = Math.cos(angle) * speed;
+  let vy = Math.sin(angle) * speed;
+  let cx = px, cy = py;
+  const ctx2 = bgCv.getContext('2d');
+
+  function draw(){
+    if(life.v <= 0) return;
+    ctx2.save();
+    ctx2.globalAlpha = life.v * 0.8;
+    ctx2.fillStyle = ACCENT;
+    ctx2.shadowColor = ACCENT;
+    ctx2.shadowBlur = 6;
+    ctx2.beginPath();
+    ctx2.arc(cx, cy, 3 * life.v, 0, Math.PI*2);
+    ctx2.fill();
+    ctx2.restore();
+    cx += vx; cy += vy;
+    vx *= 0.92; vy *= 0.92;
+    life.v -= 0.045;
+    requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+document.addEventListener('mouseenter', e => {
+  const btn = e.target.closest('.back-btn');
+  if(!btn) return;
+  const r = btn.getBoundingClientRect();
+  const cx = r.left + r.width/2;
+  const cy = r.top  + r.height/2;
+  for(let i=0; i<8; i++) spawnBurstParticle(cx, cy);
+}, true);
+
+/* ── 3. UI SOUNDS (Web Audio, no files) ────────────────────────────── */
+let _audioCtx = null;
+function getAudioCtx(){
+  if(!_audioCtx) try { _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){}
+  return _audioCtx;
+}
+
+function playWhoosh(){
+  const ac = getAudioCtx(); if(!ac) return;
+  const buf = ac.createBuffer(1, ac.sampleRate * .25, ac.sampleRate);
+  const data = buf.getChannelData(0);
+  for(let i=0;i<data.length;i++) data[i] = (Math.random()*2-1) * (1 - i/data.length);
+  const src = ac.createBufferSource();
+  src.buffer = buf;
+  const f = ac.createBiquadFilter(); f.type='bandpass'; f.frequency.value=800; f.Q.value=0.5;
+  const g = ac.createGain(); g.gain.setValueAtTime(.18, ac.currentTime); g.gain.exponentialRampToValueAtTime(.001, ac.currentTime+.25);
+  src.connect(f); f.connect(g); g.connect(ac.destination);
+  src.start();
+}
+
+function playBeep(freq=1100, dur=.09){
+  const ac = getAudioCtx(); if(!ac) return;
+  const o = ac.createOscillator();
+  const g = ac.createGain();
+  o.type = 'sine';
+  o.frequency.setValueAtTime(freq, ac.currentTime);
+  o.frequency.exponentialRampToValueAtTime(freq*0.6, ac.currentTime+dur);
+  g.gain.setValueAtTime(.08, ac.currentTime);
+  g.gain.exponentialRampToValueAtTime(.001, ac.currentTime+dur);
+  o.connect(g); g.connect(ac.destination);
+  o.start(); o.stop(ac.currentTime+dur);
+}
+
+function playConfirm(){
+  playBeep(880, .06);
+  setTimeout(()=>playBeep(1320,.06), 70);
+}
+
+// Wire sounds to AI / action buttons (exclude back-btn — already has whoosh)
+document.addEventListener('click', e => {
+  const btn = e.target.closest('button');
+  if(!btn) return;
+  if(btn.closest('#na-achievement-toast')) return;
+  const txt = (btn.innerText||'').toLowerCase();
+  // whoosh for nav/reset, confirm beep for AI/action
+  if(txt.includes('ai') || txt.includes('run') || txt.includes('solve') ||
+     txt.includes('evolve') || txt.includes('decrypt') || txt.includes('submit') ||
+     txt.includes('recursion') || txt.includes('pilot') || txt.includes('tactical') ||
+     txt.includes('encrypt') || txt.includes('cluster') || txt.includes('paint') ||
+     txt.includes('step') || txt.includes('next') || txt.includes('shield') ||
+     txt.includes('scan') || txt.includes('tour')) {
+    playConfirm();
+  } else if(txt.includes('reset') || txt.includes('restart') || txt.includes('reboot') ||
+            txt.includes('clear') || txt.includes('new') || txt.includes('scramble') ||
+            txt.includes('randomize') || txt.includes('reload')) {
+    playWhoosh();
+  } else {
+    playBeep(660, .05); // generic click tick
+  }
+}, true);
+
+/* ── 4. ACHIEVEMENT SYSTEM ─────────────────────────────────────────── */
+const toast = document.getElementById('na-achievement-toast');
+let toastTimer = null;
+
+function showAchievement(icon, title, desc){
+  toast.innerHTML = `<span style="font-size:1.4rem">${icon}</span><div><div style="color:var(--ac,#00ffcc);letter-spacing:2px">${title}</div><div style="color:#aaa;font-size:.62rem;margin-top:2px;letter-spacing:1px">${desc}</div></div>`;
+  toast.style.opacity = '1';
+  toast.style.transform = 'translateY(0)';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>{
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(16px)';
+  }, 3500);
+}
+
+function unlockAchievement(key, icon, title, desc){
+  const stored = JSON.parse(localStorage.getItem('na_achievements') || '{}');
+  if(stored[key]) return false; // already earned
+  stored[key] = { ts: Date.now(), title, desc };
+  localStorage.setItem('na_achievements', JSON.stringify(stored));
+  showAchievement(icon, title, desc);
+  return true;
+}
+
+// Expose globally so per-game code can call it
+window.NA = window.NA || {};
+window.NA.unlockAchievement = unlockAchievement;
+window.NA.playBeep     = playBeep;
+window.NA.playConfirm  = playConfirm;
+window.NA.playWhoosh   = playWhoosh;
+window.NA.navigateTo   = navigateWithTransition;
+
+})();
+</script>
+
+
+<script>
+/* evo achievements */
+(function(){
+  const origLoop = window.loop;
+  let gen0 = false;
+  if(origLoop) window.loop = function(){
+    if(!gen0){ gen0=true; window.NA.unlockAchievement('evo_start','🧬','GENESIS','Started first evolution run!'); }
+    origLoop();
+  };
+  // Intercept fetch to detect 100% fitness
+  const origFetch = window.fetch;
+  window.fetch = function(...args){
+    return origFetch.apply(this,args).then(r=>{
+      if(args[0]&&args[0].includes('solve_evo')){
+        return r.clone().json().then(d=>{
+          if(d.fitness>=100) window.NA.unlockAchievement('evo_win','🏅','PERFECT DNA','Evolved to 100% fitness!');
+          return new Response(JSON.stringify(d),{headers:{'Content-Type':'application/json'}});
+        });
+      }
+      return r;
+    });
+  };
+})();
+</script>
+
+</body>
+</html>

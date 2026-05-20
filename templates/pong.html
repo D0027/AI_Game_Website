@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEURAL ARENA | Neon Pong</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        /* --- CORE STYLES --- */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: #020202; color: #fff; font-family: 'Rajdhani', sans-serif;
+            display: flex; flex-direction: column; align-items: center; 
+            /* FIX: Changed justify-content to flex-start so top doesn't get cut off */
+            justify-content: flex-start; 
+            min-height: 100vh; 
+            /* FIX: Allow scrolling if screen is too small */
+            overflow-y: auto; 
+            overflow-x: hidden;
+            padding-top: 20px;
+            padding-bottom: 50px; /* FIX: Space for bottom text */
+        }
+        #neural-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; background: radial-gradient(circle at center, #0a0a0a 0%, #000 100%); }
+        .scanlines { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2)); background-size: 100% 4px; pointer-events: none; z-index: -1; opacity: 0.3; }
+
+        .back-btn { position: absolute; top: 30px; left: 30px; text-decoration: none; color: #aa00ff; font-family: 'Orbitron'; font-size: 1rem; border: 1px solid #aa00ff; padding: 10px 20px; border-radius: 5px; transition: 0.3s; background: rgba(170, 0, 255, 0.1); }
+        .back-btn:hover { background-color: #aa00ff; color: #000; box-shadow: 0 0 25px #aa00ff; }
+
+        h1 { font-family: 'Orbitron'; font-size: 3.5rem; text-shadow: 0 0 20px #aa00ff; color: #aa00ff; margin-bottom: 5px; margin-top: 40px; }
+        
+        /* NEW NOTICE STYLE */
+        .notice {
+            font-family: 'Orbitron'; font-size: 1.2rem; color: #fff; letter-spacing: 3px;
+            margin-bottom: 25px; text-shadow: 0 0 10px #aa00ff; opacity: 0.8;
+            border-bottom: 1px solid #aa00ff; padding-bottom: 5px;
+        }
+
+        /* SCOREBOARD */
+        .score-board {
+            display: flex; gap: 50px; font-family: 'Orbitron'; font-size: 3rem; font-weight: bold;
+            margin-bottom: 20px; text-shadow: 0 0 10px currentColor;
+        }
+        .p-score { color: #00ffcc; }
+        .ai-score { color: #ff0055; }
+
+        /* GAME CANVAS */
+        canvas {
+            background: rgba(20, 20, 20, 0.8);
+            border: 2px solid #aa00ff;
+            box-shadow: 0 0 50px rgba(170, 0, 255, 0.3);
+            border-radius: 10px;
+            cursor: none; /* Hide cursor inside game */
+        }
+
+        #controls { margin-top: 20px; color: #888; font-family: 'Orbitron'; letter-spacing: 1px; margin-bottom: 20px; }
+        
+        .swal-custom-popup { background: #0a0a0a !important; border: 2px solid #aa00ff !important; }
+        .swal-custom-title { color: #aa00ff !important; font-family: 'Orbitron' !important; }
+    </style>
+</head>
+<body>
+    <canvas id="neural-bg"></canvas>
+    <div class="scanlines"></div>
+
+    <a href="/" class="back-btn">← DASHBOARD</a>
+    
+    <h1>NEON PONG</h1>
+    <div class="notice">FIRST TO 5 WINS</div>
+    
+    <div class="score-board">
+        <div class="p-score" id="playerScore">0</div>
+        <div>-</div>
+        <div class="ai-score" id="aiScore">0</div>
+    </div>
+
+    <canvas id="gameCanvas" width="800" height="500"></canvas>
+
+    <div id="controls">USE MOUSE TO CONTROL PADDLE</div>
+
+    <script>
+        const bgCanvas = document.getElementById('neural-bg'); const bgCtx = bgCanvas.getContext('2d');
+        bgCanvas.width = window.innerWidth; bgCanvas.height = window.innerHeight;
+        let bgParticlesArray; 
+        class BgParticle { constructor() { this.x = Math.random() * bgCanvas.width; this.y = Math.random() * bgCanvas.height; this.size = Math.random() * 2; this.speedX = (Math.random() * 1.5) - 0.75; this.speedY = (Math.random() * 1.5) - 0.75; this.color = '#aa00ff'; } update() { this.x += this.speedX; this.y += this.speedY; if (this.x < 0 || this.x > bgCanvas.width) this.speedX *= -1; if (this.y < 0 || this.y > bgCanvas.height) this.speedY *= -1; } draw() { bgCtx.fillStyle = this.color; bgCtx.beginPath(); bgCtx.arc(this.x, this.y, this.size, 0, Math.PI * 2); bgCtx.fill(); } }
+        function initBg() { bgParticlesArray = []; let numberOfParticles = (bgCanvas.height * bgCanvas.width) / 15000; for (let i = 0; i < numberOfParticles; i++) { bgParticlesArray.push(new BgParticle()); } }
+        function animateBg() { bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height); for (let i = 0; i < bgParticlesArray.length; i++) { bgParticlesArray[i].update(); bgParticlesArray[i].draw(); connectBg(i); } requestAnimationFrame(animateBg); }
+        function connectBg(a) { for (let b = a; b < bgParticlesArray.length; b++) { let distance = ((bgParticlesArray[a].x - bgParticlesArray[b].x) * (bgParticlesArray[a].x - bgParticlesArray[b].x)) + ((bgParticlesArray[a].y - bgParticlesArray[b].y) * (bgParticlesArray[a].y - bgParticlesArray[b].y)); if (distance < (bgCanvas.width/9) * (bgCanvas.height/9)) { let opacityValue = 0.8 - (distance / 20000); bgCtx.strokeStyle = 'rgba(170, 0, 255,' + opacityValue + ')'; bgCtx.lineWidth = 1; bgCtx.beginPath(); bgCtx.moveTo(bgParticlesArray[a].x, bgParticlesArray[a].y); bgCtx.lineTo(bgParticlesArray[b].x, bgParticlesArray[b].y); bgCtx.stroke(); } } }
+        window.addEventListener('resize', () => { bgCanvas.width = window.innerWidth; bgCanvas.height = window.innerHeight; initBg(); }); initBg(); animateBg();
+    </script>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Game Objects
+        let ball = { x: 400, y: 250, radius: 8, speed: 7, dx: 5, dy: 5, color: '#fff' };
+        const paddleWidth = 10, paddleHeight = 100;
+        const player = { x: 0, y: 200, score: 0, color: '#00ffcc' };
+        const ai = { x: canvas.width - paddleWidth, y: 200, score: 0, speed: 4.5, color: '#ff0055' };
+        
+        let trail = [];
+        let hitSparks = [];
+
+        function drawRect(x, y, w, h, color) {
+            ctx.fillStyle = color;
+            ctx.shadowBlur = 20; ctx.shadowColor = color;
+            ctx.fillRect(x, y, w, h);
+            ctx.shadowBlur = 0;
+        }
+
+        function drawCircle(x, y, r, color) {
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(x, y, r, 0, Math.PI * 2, false);
+            ctx.fill();
+        }
+
+        function drawTrail() {
+            for(let i=0; i<trail.length; i++) {
+                let opacity = i / trail.length;
+                ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+                ctx.beginPath();
+                ctx.arc(trail[i].x, trail[i].y, ball.radius * (i/trail.length), 0, Math.PI*2);
+                ctx.fill();
+            }
+        }
+
+        function createSparks(x, y, color) {
+            for(let i=0; i<15; i++) {
+                hitSparks.push({
+                    x: x, y: y,
+                    dx: (Math.random() - 0.5) * 10,
+                    dy: (Math.random() - 0.5) * 10,
+                    life: 1.0,
+                    color: color
+                });
+            }
+        }
+
+        function drawSparks() {
+            for(let i=0; i<hitSparks.length; i++) {
+                let s = hitSparks[i];
+                ctx.fillStyle = `rgba(${s.color === '#00ffcc' ? '0, 255, 204' : '255, 0, 85'}, ${s.life})`;
+                ctx.beginPath();
+                ctx.arc(s.x, s.y, 3, 0, Math.PI*2);
+                ctx.fill();
+                s.x += s.dx; s.y += s.dy; s.life -= 0.05;
+            }
+            hitSparks = hitSparks.filter(s => s.life > 0);
+        }
+
+        function drawNet() {
+            for (let i = 0; i <= canvas.height; i += 30) {
+                drawRect(canvas.width / 2 - 1, i, 2, 20, "#333");
+            }
+        }
+
+        function resetBall() {
+            ball.x = canvas.width / 2;
+            ball.y = canvas.height / 2;
+            ball.speed = 7;
+            let dirX = Math.random() > 0.5 ? 1 : -1;
+            let dirY = Math.random() > 0.5 ? 1 : -1;
+            ball.dx = dirX * ball.speed;
+            ball.dy = dirY * ball.speed;
+            trail = [];
+        }
+
+        function update() {
+            if(ball.dx === 0 && ball.dy === 0) return;
+
+            ball.x += ball.dx;
+            ball.y += ball.dy;
+
+            trail.push({x: ball.x, y: ball.y});
+            if(trail.length > 20) trail.shift();
+
+            if (ball.y + ball.radius > canvas.height || ball.y - ball.radius < 0) {
+                ball.dy = -ball.dy;
+            }
+
+            let playerPaddle = (ball.x < canvas.width / 2) ? player : ai;
+            
+            if (collision(ball, playerPaddle)) {
+                let collidePoint = (ball.y - (playerPaddle.y + paddleHeight / 2));
+                collidePoint = collidePoint / (paddleHeight / 2);
+                let angleRad = (Math.PI / 4) * collidePoint;
+                let direction = (ball.x < canvas.width / 2) ? 1 : -1;
+                ball.dx = direction * ball.speed * Math.cos(angleRad);
+                ball.dy = ball.speed * Math.sin(angleRad);
+                ball.speed += 0.5;
+                
+                createSparks(ball.x, ball.y, playerPaddle.color);
+                canvas.style.borderColor = playerPaddle.color;
+                setTimeout(() => canvas.style.borderColor = '#aa00ff', 100);
+            }
+
+            let targetY = ball.y - paddleHeight/2;
+            if(targetY > ai.y) ai.y += ai.speed;
+            if(targetY < ai.y) ai.y -= ai.speed;
+            if(ai.y < 0) ai.y = 0;
+            if(ai.y + paddleHeight > canvas.height) ai.y = canvas.height - paddleHeight;
+
+            if (ball.x - ball.radius < 0) {
+                ai.score++;
+                document.getElementById('aiScore').innerText = ai.score;
+                checkWin();
+                if(ball.dx !== 0) resetBall();
+            } else if (ball.x + ball.radius > canvas.width) {
+                player.score++;
+                document.getElementById('playerScore').innerText = player.score;
+                checkWin();
+                if(ball.dx !== 0) resetBall();
+            }
+        }
+
+        function collision(b, p) {
+            b.top = b.y - b.radius;
+            b.bottom = b.y + b.radius;
+            b.left = b.x - b.radius;
+            b.right = b.x + b.radius;
+            p.top = p.y;
+            p.bottom = p.y + paddleHeight;
+            p.left = p.x;
+            p.right = p.x + paddleWidth;
+            return b.right > p.left && b.bottom > p.top && b.left < p.right && b.top < p.bottom;
+        }
+
+        function draw() {
+            ctx.fillStyle = "#000";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            drawNet();
+            drawTrail();
+            drawSparks();
+            drawCircle(ball.x, ball.y, ball.radius, ball.color);
+            drawRect(player.x, player.y, paddleWidth, paddleHeight, player.color);
+            drawRect(ai.x, ai.y, paddleWidth, paddleHeight, ai.color);
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        canvas.addEventListener("mousemove", (evt) => {
+            let rect = canvas.getBoundingClientRect();
+            player.y = evt.clientY - rect.top - paddleHeight / 2;
+            if(player.y < 0) player.y = 0;
+            if(player.y + paddleHeight > canvas.height) player.y = canvas.height - paddleHeight;
+        });
+
+        function checkWin() {
+            if(player.score >= 5 || ai.score >= 5) {
+                let msg = player.score >= 5 ? "YOU WIN!" : "AI WINS!";
+                let col = player.score >= 5 ? "#00ffcc" : "#ff0055";
+                let ico = player.score >= 5 ? "success" : "error";
+                ball.dx = 0; ball.dy = 0; 
+                
+                Swal.fire({
+                    title: msg,
+                    background: '#0a0a0a', color: col, icon: ico,
+                    confirmButtonText: 'RESTART',
+                    customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title' }
+                }).then(() => {
+                    player.score = 0; ai.score = 0;
+                    document.getElementById('playerScore').innerText = 0;
+                    document.getElementById('aiScore').innerText = 0;
+                    resetBall();
+                });
+            }
+        }
+
+        gameLoop();
+    </script>
+
+<style>
+/* ── NEURAL ARENA ENHANCEMENT LAYER ── */
+#na-transition{position:fixed;inset:0;background:#000;z-index:99999;opacity:0;pointer-events:none;transition:opacity .3s ease;}
+#na-transition.active{opacity:1;pointer-events:all;}
+</style>
+
+<div id="na-transition"></div>
+<script>
+/* ═══════════════════════════════════════════════════════════
+   NEURAL ARENA — ENHANCEMENT LAYER v2.0
+   1. Page Transition  2. Particle Burst  3. UI Sounds  4. Achievements
+═══════════════════════════════════════════════════════════ */
+(function(){
+  'use strict';
+
+  /* ── 1. PAGE TRANSITION OVERLAY ─────────────────────────────
+     Intercepts any nav link click, fades screen to black (300ms),
+     then navigates. Applied to .back-btn and all <a href> links.    */
+  const _overlay = document.getElementById('na-transition');
+
+  function _navTo(url){
+    if(!url || url === '#') return;
+    _overlay.classList.add('active');
+    setTimeout(()=>{ window.location.href = url; }, 310);
+  }
+
+  document.addEventListener('DOMContentLoaded', ()=>{
+    // Intercept back-btn
+    const backBtn = document.querySelector('.back-btn');
+    if(backBtn){
+      backBtn.addEventListener('click', e=>{
+        e.preventDefault();
+        _sfx('whoosh');
+        _navTo(backBtn.getAttribute('href'));
+      });
+    }
+    // Intercept any other anchor tags that go to internal pages
+    document.querySelectorAll('a[href]').forEach(a=>{
+      if(a === backBtn) return;
+      const href = a.getAttribute('href');
+      if(href && href.startsWith('/') && !a.dataset.naHooked){
+        a.dataset.naHooked = '1';
+        a.addEventListener('click', e=>{
+          e.preventDefault();
+          _navTo(href);
+        });
+      }
+    });
+    // Fade IN on page load (reverse transition)
+    _overlay.style.opacity = '1';
+    _overlay.style.pointerEvents = 'all';
+    _overlay.style.transition = 'none';
+    requestAnimationFrame(()=>{
+      _overlay.style.transition = 'opacity .35s ease';
+      requestAnimationFrame(()=>{ _overlay.style.opacity = '0'; _overlay.style.pointerEvents = 'none'; });
+    });
+  });
+
+  /* ── 2. BACK-BTN HOVER PARTICLE BURST ───────────────────────
+     Uses the existing bg canvas (id="neural-bg") — no new elements.
+     Spawns 8 particles radiating outward from cursor on btn hover.   */
+  const _BURST_COLOR = '#aa00ff';
+
+  function _spawnBurst(canvas, x, y){
+    if(!canvas) return;
+    const ctx2 = canvas.getContext('2d');
+    const pts = [];
+    for(let i=0;i<8;i++){
+      const angle = (i/8)*Math.PI*2;
+      pts.push({ x, y,
+        vx: Math.cos(angle)*(2+Math.random()*3),
+        vy: Math.sin(angle)*(2+Math.random()*3),
+        life: 1, r: 3+Math.random()*3 });
+    }
+    let frame;
+    function _draw(){
+      pts.forEach(p=>{
+        ctx2.save();
+        ctx2.globalAlpha = p.life * 0.85;
+        ctx2.fillStyle = _BURST_COLOR;
+        ctx2.shadowColor = _BURST_COLOR;
+        ctx2.shadowBlur = 8;
+        ctx2.beginPath();
+        ctx2.arc(p.x, p.y, p.r, 0, Math.PI*2);
+        ctx2.fill();
+        ctx2.restore();
+        p.x += p.vx; p.y += p.vy;
+        p.vy += 0.15; // slight gravity
+        p.life -= 0.045;
+        p.r *= 0.96;
+      });
+      if(pts.some(p=>p.life>0)) frame = requestAnimationFrame(_draw);
+    }
+    _draw();
+  }
+
+  document.addEventListener('DOMContentLoaded', ()=>{
+    const bgCv = document.getElementById('neural-bg');
+    const btn  = document.querySelector('.back-btn');
+    if(btn && bgCv){
+      btn.addEventListener('mouseenter', e=>{
+        const rect = bgCv.getBoundingClientRect();
+        const bRect = btn.getBoundingClientRect();
+        _spawnBurst(bgCv,
+          bRect.left + bRect.width/2 - rect.left,
+          bRect.top  + bRect.height/2 - rect.top);
+      });
+    }
+    // Also burst on AI/action buttons
+    document.querySelectorAll('button:not(.back-btn):not(.btn-guide)').forEach(b=>{
+      b.addEventListener('mouseenter', e=>{
+        if(!bgCv) return;
+        const rect  = bgCv.getBoundingClientRect();
+        const bRect = b.getBoundingClientRect();
+        _spawnBurst(bgCv,
+          bRect.left + bRect.width/2 - rect.left,
+          bRect.top  + bRect.height/2 - rect.top);
+      });
+    });
+  });
+
+  /* ── 3. UI SOUNDS (Web Audio API, no files) ──────────────────
+     whoosh  — back/nav button (filtered noise sweep)
+     beep    — AI/action button clicks (sine blip)
+     confirm — positive outcome (two-tone chime)
+     error   — negative outcome (descending buzz)
+     Exposed globally: window.NA_SFX('whoosh'|'beep'|'confirm'|'error') */
+  let _ac = null;
+  function _getAC(){
+    if(!_ac) try { _ac = new (window.AudioContext||window.webkitAudioContext)(); } catch(e){}
+    return _ac;
+  }
+
+  function _sfx(type){
+    const ac = _getAC(); if(!ac) return;
+    try{
+      switch(type){
+        case 'whoosh':{
+          // Band-pass noise sweep
+          const buf = ac.createBuffer(1, ac.sampleRate*0.25, ac.sampleRate);
+          const data = buf.getChannelData(0);
+          for(let i=0;i<data.length;i++) data[i]=(Math.random()*2-1);
+          const src = ac.createBufferSource();
+          src.buffer = buf;
+          const bp = ac.createBiquadFilter();
+          bp.type = 'bandpass'; bp.frequency.setValueAtTime(200,ac.currentTime);
+          bp.frequency.exponentialRampToValueAtTime(2000,ac.currentTime+0.2);
+          bp.Q.value = 0.5;
+          const g = ac.createGain();
+          g.gain.setValueAtTime(0.18,ac.currentTime);
+          g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+0.25);
+          src.connect(bp); bp.connect(g); g.connect(ac.destination);
+          src.start(); src.stop(ac.currentTime+0.25);
+          break;
+        }
+        case 'beep':{
+          const o = ac.createOscillator(), g = ac.createGain();
+          o.type='sine'; o.frequency.value=880;
+          o.frequency.exponentialRampToValueAtTime(1200,ac.currentTime+0.06);
+          g.gain.setValueAtTime(0.12,ac.currentTime);
+          g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+0.1);
+          o.connect(g); g.connect(ac.destination);
+          o.start(); o.stop(ac.currentTime+0.1);
+          break;
+        }
+        case 'confirm':{
+          [440,660].forEach((f,i)=>{
+            const o=ac.createOscillator(),g=ac.createGain();
+            o.type='sine'; o.frequency.value=f;
+            g.gain.setValueAtTime(0,ac.currentTime+i*0.12);
+            g.gain.linearRampToValueAtTime(0.12,ac.currentTime+i*0.12+0.04);
+            g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+i*0.12+0.18);
+            o.connect(g); g.connect(ac.destination);
+            o.start(ac.currentTime+i*0.12);
+            o.stop(ac.currentTime+i*0.12+0.2);
+          });
+          break;
+        }
+        case 'error':{
+          const o=ac.createOscillator(),g=ac.createGain();
+          o.type='sawtooth'; o.frequency.value=220;
+          o.frequency.exponentialRampToValueAtTime(80,ac.currentTime+0.18);
+          g.gain.setValueAtTime(0.1,ac.currentTime);
+          g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+0.2);
+          o.connect(g); g.connect(ac.destination);
+          o.start(); o.stop(ac.currentTime+0.2);
+          break;
+        }
+      }
+    }catch(e){}
+  }
+  window.NA_SFX = _sfx;
+
+  // Wire beep to AI/action buttons
+  document.addEventListener('DOMContentLoaded',()=>{
+    document.querySelectorAll('button:not(.back-btn):not(.btn-guide)').forEach(b=>{
+      b.addEventListener('click', ()=>_sfx('beep'));
+    });
+  });
+
+  /* ── 4. ACHIEVEMENT SYSTEM (localStorage) ────────────────────
+     window.NA_ACHIEVE(key, title, desc) — call on trigger events.
+     Writes to localStorage['na_achievements'] and shows a toast.
+     Pre-wired trigger: fires on page load if game was completed.     */
+  function _showToast(title, desc){
+    const t = document.createElement('div');
+    t.style.cssText = [
+      'position:fixed','bottom:30px','right:30px','z-index:99998',
+      'background:rgba(5,10,18,.97)','border:1px solid #aa00ff',
+      'border-radius:10px','padding:14px 20px','max-width:320px',
+      'font-family:Orbitron,sans-serif','color:#fff',
+      'box-shadow:0 0 30px rgba(0,0,0,.6),0 0 20px rgba(170,0,255,.35)',
+      'animation:na-toast-in .4s cubic-bezier(.4,0,.2,1)',
+      'display:flex','gap:14px','align-items:center'
+    ].join(';').replace(/#aa00ff/g,'#aa00ff').replace(/rgba(170,0,255,.35)/g,'rgba(170,0,255,.35)');
+    t.innerHTML = `
+      <div style="font-size:1.6rem;flex-shrink:0">🏆</div>
+      <div>
+        <div style="color:#aa00ff;font-size:.55rem;letter-spacing:3px;margin-bottom:3px">ACHIEVEMENT UNLOCKED</div>
+        <div style="font-size:.78rem;letter-spacing:1.5px;margin-bottom:2px">${title}</div>
+        <div style="font-size:.65rem;color:#aaa;font-family:Rajdhani,sans-serif;font-weight:300">${desc}</div>
+      </div>`;
+    // inject keyframe once
+    if(!document.getElementById('na-toast-kf')){
+      const s=document.createElement('style');
+      s.id='na-toast-kf';
+      s.textContent='@keyframes na-toast-in{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:none}}';
+      document.head.appendChild(s);
+    }
+    document.body.appendChild(t);
+    setTimeout(()=>{ t.style.transition='opacity .5s'; t.style.opacity='0'; setTimeout(()=>t.remove(),500); }, 3800);
+  }
+
+  function _achieve(key, title, desc){
+    try{
+      let all = JSON.parse(localStorage.getItem('na_achievements')||'{}');
+      if(all[key]) return; // already earned
+      all[key] = { title, desc, ts: Date.now() };
+      localStorage.setItem('na_achievements', JSON.stringify(all));
+    }catch(e){}
+    _sfx('confirm');
+    _showToast(title, desc);
+  }
+  window.NA_ACHIEVE = _achieve;
+
+  // ── AUTO-TRIGGER: page-load achievement (visiting counts) ──
+  document.addEventListener('DOMContentLoaded',()=>{
+    _achieve('PONG_CHAMPION','Reflex Champion','You won at Pong!');
+  });
+
+})();
+</script>
+
+</body>
+</html>

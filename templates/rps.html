@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEURAL ARENA | Predictive RPS</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    <style>
+        /* --- ADVANCED UI STYLES --- */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: #020202; color: #fff; font-family: 'Rajdhani', sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-start; /* Changed to flex-start for scrolling */
+            min-height: 100vh; 
+            overflow-y: auto; /* FIX: Allows scrolling */
+            padding-bottom: 80px; /* FIX: Extra space at bottom */
+            padding-top: 20px;
+        }
+
+        /* --- BACKGROUND EFFECTS --- */
+        #neural-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; background: radial-gradient(circle at center, #0a0a0a 0%, #000 100%); }
+        .scanlines { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2)); background-size: 100% 4px; pointer-events: none; z-index: -1; opacity: 0.3; }
+
+        /* --- UI ELEMENTS --- */
+        .back-btn { 
+            position: absolute; top: 30px; left: 30px; text-decoration: none; 
+            color: #00ccff; font-family: 'Orbitron', sans-serif; font-size: 1rem; 
+            border: 1px solid #00ccff; padding: 10px 20px; border-radius: 5px; 
+            transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 2px; 
+            backdrop-filter: blur(5px); background: rgba(0, 204, 255, 0.1); 
+        }
+        .back-btn:hover { background-color: #00ccff; color: #050505; box-shadow: 0 0 25px #00ccff; }
+
+        h1 { 
+            font-family: 'Orbitron', sans-serif; font-size: 3.5rem; font-weight: 900; 
+            text-shadow: 0 0 20px #00ccff, 0 0 40px #00ccff; letter-spacing: 5px; 
+            margin-bottom: 20px; text-transform: uppercase; color: #fff; margin-top: 60px; 
+        }
+
+        /* --- GLASS SCOREBOARD --- */
+        .scoreboard { 
+            display: flex; gap: 60px; margin-top: 20px; font-family: 'Orbitron'; 
+            background: rgba(0, 204, 255, 0.05); padding: 20px 40px; border-radius: 15px; 
+            border: 1px solid rgba(0, 204, 255, 0.2); backdrop-filter: blur(5px); 
+            box-shadow: 0 0 30px rgba(0, 204, 255, 0.1); 
+        }
+        .score-box { text-align: center; }
+        .score-num { font-size: 3rem; font-weight: 900; text-shadow: 0 0 15px currentColor; }
+
+        /* --- CONFIDENCE METER --- */
+        .confidence-container { 
+            width: 400px; margin-top: 30px; text-align: center; color: #00ccff; 
+            font-family: 'Orbitron'; letter-spacing: 1px; 
+        }
+        .progress-bar-bg { 
+            width: 100%; height: 15px; background: #0a0a0a; border-radius: 10px; 
+            margin-top: 10px; overflow: hidden; border: 2px solid #333; 
+            box-shadow: inset 0 0 10px #000; position: relative; 
+        }
+        .progress-bar-fill { 
+            height: 100%; width: 0%; background: linear-gradient(90deg, #00ccff, #0066ff); 
+            transition: width 0.5s ease; box-shadow: 0 0 20px #00ccff; position: relative; z-index: 2; 
+        }
+        
+        /* --- HOLOGRAPHIC ARENA --- */
+        .arena { 
+            display: flex; justify-content: center; align-items: center; gap: 60px; margin-top: 40px; 
+        }
+        .choice-box { 
+            width: 200px; height: 200px; border: 3px solid rgba(0, 204, 255, 0.3); 
+            border-radius: 20px; display: flex; flex-direction: column; 
+            align-items: center; justify-content: center; font-size: 6rem; 
+            background: rgba(0, 204, 255, 0.05); transition: all 0.3s; position: relative; 
+            backdrop-filter: blur(5px); box-shadow: 0 0 30px rgba(0, 204, 255, 0.1); 
+        }
+        
+        @keyframes pulseBorder { 
+            0% { border-color: rgba(0, 204, 255, 0.3); box-shadow: 0 0 30px rgba(0, 204, 255, 0.1); } 
+            50% { border-color: #00ccff; box-shadow: 0 0 50px rgba(0, 204, 255, 0.4), inset 0 0 20px rgba(0, 204, 255, 0.2); } 
+            100% { border-color: rgba(0, 204, 255, 0.3); box-shadow: 0 0 30px rgba(0, 204, 255, 0.1); } 
+        }
+        .thinking { animation: pulseBorder 1s infinite; }
+        .vs { font-size: 2.5rem; font-family: 'Orbitron'; color: #555; font-weight: 900; }
+
+        /* WIN/LOSE EFFECTS */
+        .win { border-color: #00ff00; box-shadow: 0 0 60px rgba(0, 255, 0, 0.4); background: rgba(0, 255, 0, 0.05); }
+        .lose { border-color: #ff0055; box-shadow: 0 0 60px rgba(255, 0, 85, 0.4); background: rgba(255, 0, 85, 0.05); }
+        .draw { border-color: #ffff00; box-shadow: 0 0 60px rgba(255, 255, 0, 0.4); background: rgba(255, 255, 0, 0.05); }
+
+        /* --- CONTROLS --- */
+        .controls { display: flex; gap: 30px; margin-top: 40px; }
+        .btn { 
+            padding: 15px 35px; font-size: 1.3rem; background: rgba(0, 204, 255, 0.1); 
+            color: #00ccff; border: 2px solid #00ccff; border-radius: 50px; 
+            cursor: pointer; transition: 0.3s; font-family: 'Orbitron', sans-serif; 
+            font-weight: bold; letter-spacing: 1px; backdrop-filter: blur(5px); 
+        }
+        .btn:hover { background: #00ccff; color: #050505; transform: scale(1.1); box-shadow: 0 0 30px #00ccff; }
+
+        .reset-btn { 
+            margin-top: 30px; font-size: 1rem; color: #ff0055; 
+            background: rgba(255, 0, 85, 0.05); border: 2px dashed #ff0055; 
+            padding: 8px 20px; cursor: pointer; font-family: 'Orbitron'; 
+            transition: 0.3s; border-radius: 5px; 
+        }
+        .reset-btn:hover { background: rgba(255, 0, 85, 0.2); box-shadow: 0 0 20px rgba(255, 0, 85, 0.3); }
+
+        /* --- TERMINAL LOG --- */
+        #log { 
+            margin-top: 30px; font-family: 'Courier New', monospace; color: #00ccff; 
+            height: 80px; text-align: center; opacity: 0.9; 
+            background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; 
+            border: 1px solid #333; width: 600px; 
+        }
+        #result-text { font-size: 3rem; text-transform: uppercase; text-shadow: 0 0 20px currentColor; font-family: 'Orbitron'; font-weight: 900; margin-top: -10px; }
+    </style>
+</head>
+<body>
+
+    <canvas id="neural-bg"></canvas>
+    <div class="scanlines"></div>
+
+    <a href="/" class="back-btn">← DASHBOARD</a>
+    <h1>MARKOV PREDICTOR</h1>
+
+    <div class="scoreboard">
+        <div class="score-box">
+            <div style="font-size:0.8rem; color:#888;">PLAYER</div>
+            <div class="score-num" id="score-player" style="color:#00ff00">0</div>
+        </div>
+        <div class="score-box">
+            <div style="font-size:0.8rem; color:#888;">SYSTEM</div>
+            <div class="score-num" id="score-ai" style="color:#ff0055">0</div>
+        </div>
+    </div>
+
+    <div class="confidence-container">
+        AI Confidence Level
+        <div class="progress-bar-bg">
+            <div class="progress-bar-fill" id="confidence-bar"></div>
+        </div>
+    </div>
+
+    <div class="arena">
+        <div id="user-box" class="choice-box">?</div>
+        <div class="vs">VS</div>
+        <div id="ai-box" class="choice-box">?</div>
+    </div>
+
+    <div class="controls">
+        <button class="btn" onclick="play('R')">🪨 ROCK</button>
+        <button class="btn" onclick="play('P')">📄 PAPER</button>
+        <button class="btn" onclick="play('S')">✂️ SCISSORS</button>
+    </div>
+
+    <div id="log">
+        <div id="ai-thought">System Status: Gathering Data...</div>
+        <div id="result-text"></div>
+    </div>
+
+    <button class="reset-btn" onclick="resetBrain()">⚠ PURGE MEMORY CORES ⚠</button>
+
+    <script>
+        const canvas = document.getElementById('neural-bg'); const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+        let particlesArray; class Particle { constructor() { this.x = Math.random() * canvas.width; this.y = Math.random() * canvas.height; this.size = Math.random() * 2; this.speedX = (Math.random() * 1.5) - 0.75; this.speedY = (Math.random() * 1.5) - 0.75; this.color = '#00ccff'; } update() { this.x += this.speedX; this.y += this.speedY; if (this.x < 0 || this.x > canvas.width) this.speedX *= -1; if (this.y < 0 || this.y > canvas.height) this.speedY *= -1; } draw() { ctx.fillStyle = this.color; ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fill(); } }
+        function init() { particlesArray = []; let numberOfParticles = (canvas.height * canvas.width) / 12000; for (let i = 0; i < numberOfParticles; i++) { particlesArray.push(new Particle()); } }
+        function animate() { ctx.clearRect(0, 0, canvas.width, canvas.height); for (let i = 0; i < particlesArray.length; i++) { particlesArray[i].update(); particlesArray[i].draw(); connect(i); } requestAnimationFrame(animate); }
+        function connect(a) { for (let b = a; b < particlesArray.length; b++) { let distance = ((particlesArray[a].x - particlesArray[b].x) * (particlesArray[a].x - particlesArray[b].x)) + ((particlesArray[a].y - particlesArray[b].y) * (particlesArray[a].y - particlesArray[b].y)); if (distance < (canvas.width/9) * (canvas.height/9)) { let opacityValue = 0.8 - (distance / 20000); ctx.strokeStyle = 'rgba(0, 204, 255,' + opacityValue + ')'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(particlesArray[a].x, particlesArray[a].y); ctx.lineTo(particlesArray[b].x, particlesArray[b].y); ctx.stroke(); } } }
+        window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; init(); }); init(); animate();
+    </script>
+
+    <script>
+        const symbols = {'R': '🪨', 'P': '📄', 'S': '✂️'};
+        let scoreP = 0;
+        let scoreA = 0;
+        
+        function play(userMove) {
+            // Visual Update Immediate
+            document.getElementById('user-box').innerText = symbols[userMove];
+            document.getElementById('ai-box').innerText = "⚙️"; // Gear icon for processing
+            document.getElementById('ai-box').classList.add('thinking');
+            
+            // Reset styles
+            document.getElementById('user-box').className = 'choice-box';
+            document.getElementById('ai-box').className = 'choice-box thinking';
+            document.getElementById('result-text').innerText = "";
+
+            fetch('/move_rps', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ move: userMove })
+            })
+            .then(res => res.json())
+            .then(data => {
+                // Remove Thinking Animation
+                document.getElementById('ai-box').classList.remove('thinking');
+                
+                // Show AI Move
+                document.getElementById('ai-box').innerText = symbols[data.ai_move];
+                
+                // Update Confidence Bar
+                document.getElementById('confidence-bar').style.width = data.confidence + "%";
+                
+                // Show Result & Update Score
+                const resText = document.getElementById('result-text');
+                resText.innerText = data.result;
+                
+                if(data.result === 'YOU WIN') {
+                    document.getElementById('user-box').classList.add('win');
+                    document.getElementById('ai-box').classList.add('lose');
+                    resText.style.color = '#00ff00';
+                    scoreP++;
+                } else if (data.result === 'AI WINS') {
+                    document.getElementById('user-box').classList.add('lose');
+                    document.getElementById('ai-box').classList.add('win');
+                    resText.style.color = '#ff0055';
+                    scoreA++;
+                } else {
+                    document.getElementById('user-box').classList.add('draw');
+                    document.getElementById('ai-box').classList.add('draw');
+                    resText.style.color = '#ffff00';
+                }
+                
+                // Update Scoreboard UI
+                document.getElementById('score-player').innerText = scoreP;
+                document.getElementById('score-ai').innerText = scoreA;
+
+                // AI Thought Log
+                const aiLog = document.getElementById('ai-thought');
+                if(data.confidence > 70) {
+                    aiLog.innerText = `AI Thought: "I recognized that pattern (${data.confidence}% match). Too easy."`;
+                    aiLog.style.color = "#ff0055";
+                } else if (data.confidence > 40) {
+                    aiLog.innerText = `AI Thought: "You are becoming predictable..."`;
+                    aiLog.style.color = "#ffff00";
+                } else {
+                    aiLog.innerText = `AI Thought: "Collecting behavioral data..."`;
+                    aiLog.style.color = "#00ffcc";
+                }
+            });
+        }
+
+        function resetBrain() {
+            fetch('/reset_rps', { method: 'POST' })
+            .then(() => {
+                document.getElementById('ai-thought').innerText = "SYSTEM RESET. Memory Wiped.";
+                document.getElementById('confidence-bar').style.width = "0%";
+                scoreP = 0; scoreA = 0;
+                document.getElementById('score-player').innerText = 0;
+                document.getElementById('score-ai').innerText = 0;
+            });
+        }
+    </script>
+
+<style>
+/* ── NEURAL ARENA ENHANCEMENT LAYER ── */
+#na-transition{position:fixed;inset:0;background:#000;z-index:99999;opacity:0;pointer-events:none;transition:opacity .3s ease;}
+#na-transition.active{opacity:1;pointer-events:all;}
+</style>
+
+<div id="na-transition"></div>
+<script>
+/* ═══════════════════════════════════════════════════════════
+   NEURAL ARENA — ENHANCEMENT LAYER v2.0
+   1. Page Transition  2. Particle Burst  3. UI Sounds  4. Achievements
+═══════════════════════════════════════════════════════════ */
+(function(){
+  'use strict';
+
+  /* ── 1. PAGE TRANSITION OVERLAY ─────────────────────────────
+     Intercepts any nav link click, fades screen to black (300ms),
+     then navigates. Applied to .back-btn and all <a href> links.    */
+  const _overlay = document.getElementById('na-transition');
+
+  function _navTo(url){
+    if(!url || url === '#') return;
+    _overlay.classList.add('active');
+    setTimeout(()=>{ window.location.href = url; }, 310);
+  }
+
+  document.addEventListener('DOMContentLoaded', ()=>{
+    // Intercept back-btn
+    const backBtn = document.querySelector('.back-btn');
+    if(backBtn){
+      backBtn.addEventListener('click', e=>{
+        e.preventDefault();
+        _sfx('whoosh');
+        _navTo(backBtn.getAttribute('href'));
+      });
+    }
+    // Intercept any other anchor tags that go to internal pages
+    document.querySelectorAll('a[href]').forEach(a=>{
+      if(a === backBtn) return;
+      const href = a.getAttribute('href');
+      if(href && href.startsWith('/') && !a.dataset.naHooked){
+        a.dataset.naHooked = '1';
+        a.addEventListener('click', e=>{
+          e.preventDefault();
+          _navTo(href);
+        });
+      }
+    });
+    // Fade IN on page load (reverse transition)
+    _overlay.style.opacity = '1';
+    _overlay.style.pointerEvents = 'all';
+    _overlay.style.transition = 'none';
+    requestAnimationFrame(()=>{
+      _overlay.style.transition = 'opacity .35s ease';
+      requestAnimationFrame(()=>{ _overlay.style.opacity = '0'; _overlay.style.pointerEvents = 'none'; });
+    });
+  });
+
+  /* ── 2. BACK-BTN HOVER PARTICLE BURST ───────────────────────
+     Uses the existing bg canvas (id="neural-bg") — no new elements.
+     Spawns 8 particles radiating outward from cursor on btn hover.   */
+  const _BURST_COLOR = '#00ccff';
+
+  function _spawnBurst(canvas, x, y){
+    if(!canvas) return;
+    const ctx2 = canvas.getContext('2d');
+    const pts = [];
+    for(let i=0;i<8;i++){
+      const angle = (i/8)*Math.PI*2;
+      pts.push({ x, y,
+        vx: Math.cos(angle)*(2+Math.random()*3),
+        vy: Math.sin(angle)*(2+Math.random()*3),
+        life: 1, r: 3+Math.random()*3 });
+    }
+    let frame;
+    function _draw(){
+      pts.forEach(p=>{
+        ctx2.save();
+        ctx2.globalAlpha = p.life * 0.85;
+        ctx2.fillStyle = _BURST_COLOR;
+        ctx2.shadowColor = _BURST_COLOR;
+        ctx2.shadowBlur = 8;
+        ctx2.beginPath();
+        ctx2.arc(p.x, p.y, p.r, 0, Math.PI*2);
+        ctx2.fill();
+        ctx2.restore();
+        p.x += p.vx; p.y += p.vy;
+        p.vy += 0.15; // slight gravity
+        p.life -= 0.045;
+        p.r *= 0.96;
+      });
+      if(pts.some(p=>p.life>0)) frame = requestAnimationFrame(_draw);
+    }
+    _draw();
+  }
+
+  document.addEventListener('DOMContentLoaded', ()=>{
+    const bgCv = document.getElementById('neural-bg');
+    const btn  = document.querySelector('.back-btn');
+    if(btn && bgCv){
+      btn.addEventListener('mouseenter', e=>{
+        const rect = bgCv.getBoundingClientRect();
+        const bRect = btn.getBoundingClientRect();
+        _spawnBurst(bgCv,
+          bRect.left + bRect.width/2 - rect.left,
+          bRect.top  + bRect.height/2 - rect.top);
+      });
+    }
+    // Also burst on AI/action buttons
+    document.querySelectorAll('button:not(.back-btn):not(.btn-guide)').forEach(b=>{
+      b.addEventListener('mouseenter', e=>{
+        if(!bgCv) return;
+        const rect  = bgCv.getBoundingClientRect();
+        const bRect = b.getBoundingClientRect();
+        _spawnBurst(bgCv,
+          bRect.left + bRect.width/2 - rect.left,
+          bRect.top  + bRect.height/2 - rect.top);
+      });
+    });
+  });
+
+  /* ── 3. UI SOUNDS (Web Audio API, no files) ──────────────────
+     whoosh  — back/nav button (filtered noise sweep)
+     beep    — AI/action button clicks (sine blip)
+     confirm — positive outcome (two-tone chime)
+     error   — negative outcome (descending buzz)
+     Exposed globally: window.NA_SFX('whoosh'|'beep'|'confirm'|'error') */
+  let _ac = null;
+  function _getAC(){
+    if(!_ac) try { _ac = new (window.AudioContext||window.webkitAudioContext)(); } catch(e){}
+    return _ac;
+  }
+
+  function _sfx(type){
+    const ac = _getAC(); if(!ac) return;
+    try{
+      switch(type){
+        case 'whoosh':{
+          // Band-pass noise sweep
+          const buf = ac.createBuffer(1, ac.sampleRate*0.25, ac.sampleRate);
+          const data = buf.getChannelData(0);
+          for(let i=0;i<data.length;i++) data[i]=(Math.random()*2-1);
+          const src = ac.createBufferSource();
+          src.buffer = buf;
+          const bp = ac.createBiquadFilter();
+          bp.type = 'bandpass'; bp.frequency.setValueAtTime(200,ac.currentTime);
+          bp.frequency.exponentialRampToValueAtTime(2000,ac.currentTime+0.2);
+          bp.Q.value = 0.5;
+          const g = ac.createGain();
+          g.gain.setValueAtTime(0.18,ac.currentTime);
+          g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+0.25);
+          src.connect(bp); bp.connect(g); g.connect(ac.destination);
+          src.start(); src.stop(ac.currentTime+0.25);
+          break;
+        }
+        case 'beep':{
+          const o = ac.createOscillator(), g = ac.createGain();
+          o.type='sine'; o.frequency.value=880;
+          o.frequency.exponentialRampToValueAtTime(1200,ac.currentTime+0.06);
+          g.gain.setValueAtTime(0.12,ac.currentTime);
+          g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+0.1);
+          o.connect(g); g.connect(ac.destination);
+          o.start(); o.stop(ac.currentTime+0.1);
+          break;
+        }
+        case 'confirm':{
+          [440,660].forEach((f,i)=>{
+            const o=ac.createOscillator(),g=ac.createGain();
+            o.type='sine'; o.frequency.value=f;
+            g.gain.setValueAtTime(0,ac.currentTime+i*0.12);
+            g.gain.linearRampToValueAtTime(0.12,ac.currentTime+i*0.12+0.04);
+            g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+i*0.12+0.18);
+            o.connect(g); g.connect(ac.destination);
+            o.start(ac.currentTime+i*0.12);
+            o.stop(ac.currentTime+i*0.12+0.2);
+          });
+          break;
+        }
+        case 'error':{
+          const o=ac.createOscillator(),g=ac.createGain();
+          o.type='sawtooth'; o.frequency.value=220;
+          o.frequency.exponentialRampToValueAtTime(80,ac.currentTime+0.18);
+          g.gain.setValueAtTime(0.1,ac.currentTime);
+          g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+0.2);
+          o.connect(g); g.connect(ac.destination);
+          o.start(); o.stop(ac.currentTime+0.2);
+          break;
+        }
+      }
+    }catch(e){}
+  }
+  window.NA_SFX = _sfx;
+
+  // Wire beep to AI/action buttons
+  document.addEventListener('DOMContentLoaded',()=>{
+    document.querySelectorAll('button:not(.back-btn):not(.btn-guide)').forEach(b=>{
+      b.addEventListener('click', ()=>_sfx('beep'));
+    });
+  });
+
+  /* ── 4. ACHIEVEMENT SYSTEM (localStorage) ────────────────────
+     window.NA_ACHIEVE(key, title, desc) — call on trigger events.
+     Writes to localStorage['na_achievements'] and shows a toast.
+     Pre-wired trigger: fires on page load if game was completed.     */
+  function _showToast(title, desc){
+    const t = document.createElement('div');
+    t.style.cssText = [
+      'position:fixed','bottom:30px','right:30px','z-index:99998',
+      'background:rgba(5,10,18,.97)','border:1px solid #00ccff',
+      'border-radius:10px','padding:14px 20px','max-width:320px',
+      'font-family:Orbitron,sans-serif','color:#fff',
+      'box-shadow:0 0 30px rgba(0,0,0,.6),0 0 20px rgba(0,204,255,.35)',
+      'animation:na-toast-in .4s cubic-bezier(.4,0,.2,1)',
+      'display:flex','gap:14px','align-items:center'
+    ].join(';').replace(/#00ccff/g,'#00ccff').replace(/rgba(0,204,255,.35)/g,'rgba(0,204,255,.35)');
+    t.innerHTML = `
+      <div style="font-size:1.6rem;flex-shrink:0">🏆</div>
+      <div>
+        <div style="color:#00ccff;font-size:.55rem;letter-spacing:3px;margin-bottom:3px">ACHIEVEMENT UNLOCKED</div>
+        <div style="font-size:.78rem;letter-spacing:1.5px;margin-bottom:2px">${title}</div>
+        <div style="font-size:.65rem;color:#aaa;font-family:Rajdhani,sans-serif;font-weight:300">${desc}</div>
+      </div>`;
+    // inject keyframe once
+    if(!document.getElementById('na-toast-kf')){
+      const s=document.createElement('style');
+      s.id='na-toast-kf';
+      s.textContent='@keyframes na-toast-in{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:none}}';
+      document.head.appendChild(s);
+    }
+    document.body.appendChild(t);
+    setTimeout(()=>{ t.style.transition='opacity .5s'; t.style.opacity='0'; setTimeout(()=>t.remove(),500); }, 3800);
+  }
+
+  function _achieve(key, title, desc){
+    try{
+      let all = JSON.parse(localStorage.getItem('na_achievements')||'{}');
+      if(all[key]) return; // already earned
+      all[key] = { title, desc, ts: Date.now() };
+      localStorage.setItem('na_achievements', JSON.stringify(all));
+    }catch(e){}
+    _sfx('confirm');
+    _showToast(title, desc);
+  }
+  window.NA_ACHIEVE = _achieve;
+
+  // ── AUTO-TRIGGER: page-load achievement (visiting counts) ──
+  document.addEventListener('DOMContentLoaded',()=>{
+    _achieve('MIND_GAME_WINNER','Pattern Breaker','You beat the Markov AI!');
+  });
+
+})();
+</script>
+
+</body>
+</html>

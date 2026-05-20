@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEURAL ARENA | Neon Pack</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        /* --- CORE STYLES --- */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: #020202; color: #fff; font-family: 'Rajdhani', sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+            min-height: 100vh; overflow-y: auto; padding-top: 20px; padding-bottom: 50px;
+            user-select: none;
+        }
+        #neural-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; background: radial-gradient(circle at center, #1a1400 0%, #000 100%); }
+        .scanlines { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2)); background-size: 100% 4px; pointer-events: none; z-index: -1; opacity: 0.3; }
+
+        .back-btn { position: absolute; top: 30px; left: 30px; text-decoration: none; color: #ffbf00; font-family: 'Orbitron'; font-size: 1rem; border: 1px solid #ffbf00; padding: 10px 20px; border-radius: 5px; transition: 0.3s; background: rgba(255, 191, 0, 0.1); }
+        .back-btn:hover { background-color: #ffbf00; color: #000; box-shadow: 0 0 25px #ffbf00; }
+
+        h1 { font-family: 'Orbitron'; font-size: 3.5rem; text-shadow: 0 0 20px #ffbf00; color: #ffbf00; margin-bottom: 30px; margin-top: 40px; }
+
+        /* PACKING UI */
+        .game-container {
+            display: flex; gap: 40px; align-items: flex-start;
+            width: 90%; max-width: 1200px;
+        }
+
+        .section {
+            background: rgba(20, 15, 0, 0.8);
+            border: 2px solid #ffbf00;
+            padding: 20px; border-radius: 10px;
+            box-shadow: 0 0 30px rgba(255, 191, 0, 0.1);
+            min-height: 500px;
+        }
+
+        #item-pool { width: 30%; position: relative; }
+        #bin-container { width: 70%; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 15px; }
+
+        .bin {
+            width: 100px; height: 300px;
+            border: 2px dashed #555;
+            background: rgba(255,255,255,0.05);
+            display: flex; flex-direction: column-reverse; /* Stack from bottom */
+            justify-content: flex-start;
+            position: relative;
+            transition: 0.3s;
+        }
+        .bin::after { content: 'BIN'; position: absolute; top: -25px; left: 50%; transform: translateX(-50%); color: #555; font-family: 'Orbitron'; font-size: 0.8rem; }
+        .bin.active { border-color: #ffbf00; box-shadow: 0 0 15px #ffbf00; }
+
+        .block {
+            width: 80px; 
+            background: linear-gradient(45deg, #ffbf00, #ff8c00);
+            border: 1px solid #000;
+            box-sizing: border-box;
+            color: #000; font-weight: bold; font-size: 0.8rem;
+            display: flex; align-items: center; justify-content: center;
+            cursor: grab;
+            position: absolute; /* Needed for free dragging */
+            z-index: 10;
+            box-shadow: 0 0 10px #000;
+        }
+        .block:active { cursor: grabbing; z-index: 100; box-shadow: 0 0 20px #ffbf00; }
+        
+        /* Used when block is inside a bin */
+        .block.packed {
+            position: relative; 
+            width: 100%;
+            left: 0 !important;
+            top: 0 !important;
+            margin-bottom: 2px;
+        }
+
+        .controls-area { margin-top: 30px; display: flex; gap: 20px; }
+        button {
+            padding: 10px 30px; font-family: 'Orbitron'; font-size: 1rem; color: #000; background: #ffbf00;
+            border: none; cursor: pointer; border-radius: 5px; box-shadow: 0 0 20px #ffbf00; transition: 0.3s;
+        }
+        button:hover { transform: scale(1.1); box-shadow: 0 0 40px #ffbf00; }
+        .btn-guide { background: transparent; border: 2px solid #ffbf00; color: #ffbf00; }
+        .btn-guide:hover { background: #ffbf00; color: #000; }
+
+        .swal-custom-popup { background: #0a0a0a !important; border: 2px solid #ffbf00 !important; }
+        .swal-custom-title { color: #ffbf00 !important; font-family: 'Orbitron' !important; }
+        .swal-custom-content { color: #ccc !important; font-family: 'Rajdhani' !important; font-size: 1.1rem; text-align: left;}
+    </style>
+</head>
+<body>
+    <canvas id="neural-bg"></canvas>
+    <div class="scanlines"></div>
+
+    <a href="/" class="back-btn">← DASHBOARD</a>
+    <h1>NEON PACK</h1>
+
+    <div class="game-container">
+        <div id="item-pool" class="section">
+            <h3 style="width:100%; font-family:'Orbitron'; color:#ffbf00; margin-bottom:10px;">INCOMING CARGO</h3>
+            </div>
+        
+        <div id="bin-container" class="section">
+            <h3 style="width:100%; font-family:'Orbitron'; color:#ffbf00; margin-bottom:10px;">MEMORY BANKS (CAPACITY: 100)</h3>
+            </div>
+    </div>
+
+    <div class="controls-area">
+        <button class="btn-guide" onclick="showGuide()">MISSION BRIEF</button>
+        <button onclick="generateItems()">NEW CARGO</button>
+        <button onclick="runAI()">AI OPTIMIZE</button>
+    </div>
+
+    <script>
+        const bgCanvas = document.getElementById('neural-bg'); const bgCtx = bgCanvas.getContext('2d');
+        bgCanvas.width = window.innerWidth; bgCanvas.height = window.innerHeight;
+        let particles=[]; class Particle{constructor(){this.x=Math.random()*bgCanvas.width;this.y=Math.random()*bgCanvas.height;this.size=Math.random()*2;this.speedX=(Math.random()*1.0)-0.5;this.speedY=(Math.random()*1.0)-0.5;this.color='#ffbf00';}update(){this.x+=this.speedX;this.y+=this.speedY;if(this.x<0||this.x>bgCanvas.width)this.speedX*=-1;if(this.y<0||this.y>bgCanvas.height)this.speedY*=-1;}draw(){bgCtx.fillStyle=this.color;bgCtx.beginPath();bgCtx.arc(this.x,this.y,this.size,0,Math.PI*2);bgCtx.fill();}}
+        function initBg(){particles=[];for(let i=0;i<60;i++)particles.push(new Particle());}
+        function animateBg(){bgCtx.clearRect(0,0,bgCanvas.width,bgCanvas.height);for(let i=0;i<particles.length;i++){particles[i].update();particles[i].draw();connect(i);}requestAnimationFrame(animateBg);}
+        function connect(a){for(let b=a;b<particles.length;b++){let dist=((particles[a].x-particles[b].x)**2+(particles[a].y-particles[b].y)**2);if(dist<(bgCanvas.width/7)*(bgCanvas.height/7)){bgCtx.strokeStyle='rgba(255, 191, 0,'+(1-dist/25000)+')';bgCtx.lineWidth=1;bgCtx.beginPath();bgCtx.moveTo(particles[a].x,particles[a].y);bgCtx.lineTo(particles[b].x,particles[b].y);bgCtx.stroke();}}}
+        window.addEventListener('resize',()=>{bgCanvas.width=window.innerWidth;bgCanvas.height=window.innerHeight;initBg();});initBg(); animateBg();
+    </script>
+
+    <script>
+        let items = [];
+        const BIN_CAPACITY = 100;
+        let draggedItem = null;
+        let diffX = 0, diffY = 0;
+
+        function generateItems() {
+            const pool = document.getElementById('item-pool');
+            pool.innerHTML = '<h3 style="width:100%; font-family:\'Orbitron\'; color:#ffbf00; margin-bottom:10px;">INCOMING CARGO</h3>';
+            
+            // Clear bins
+            const binContainer = document.getElementById('bin-container');
+            binContainer.innerHTML = '<h3 style="width:100%; font-family:\'Orbitron\'; color:#ffbf00; margin-bottom:10px;">MEMORY BANKS (CAPACITY: 100)</h3>';
+            
+            // Create 5 Empty Bins by default for manual play
+            for(let i=0; i<5; i++) {
+                createBin(i);
+            }
+
+            items = [];
+            for(let i=0; i<10; i++) {
+                let size = Math.floor(Math.random() * 40) + 10; // 10 to 50
+                items.push(size);
+                
+                let div = document.createElement('div');
+                div.className = 'block';
+                div.style.height = (size * 3) + 'px';
+                div.innerText = size;
+                div.id = `block-${i}`;
+                div.setAttribute('data-size', size);
+                
+                // Random position in pool
+                div.style.left = (Math.random() * 200 + 20) + 'px';
+                div.style.top = (Math.random() * 300 + 60) + 'px';
+
+                // Mouse Events
+                div.onmousedown = dragStart;
+                
+                pool.appendChild(div);
+            }
+        }
+
+        function createBin(index) {
+            let binDiv = document.createElement('div');
+            binDiv.className = 'bin';
+            binDiv.id = `bin-${index}`;
+            binDiv.setAttribute('data-load', 0);
+            document.getElementById('bin-container').appendChild(binDiv);
+        }
+
+        // --- DRAG & DROP LOGIC ---
+        function dragStart(e) {
+            e.preventDefault();
+            draggedItem = e.target;
+            
+            // Calculate offset
+            const rect = draggedItem.getBoundingClientRect();
+            diffX = e.clientX - rect.left;
+            diffY = e.clientY - rect.top;
+            
+            // If dragging out of a bin, subtract its load
+            if(draggedItem.classList.contains('packed')) {
+                let parentBin = draggedItem.parentElement;
+                let size = parseInt(draggedItem.getAttribute('data-size'));
+                let currentLoad = parseInt(parentBin.getAttribute('data-load'));
+                parentBin.setAttribute('data-load', currentLoad - size);
+                
+                draggedItem.classList.remove('packed');
+                draggedItem.style.position = 'absolute';
+                document.body.appendChild(draggedItem); // Move to body for free dragging
+            }
+
+            document.addEventListener('mousemove', dragMove);
+            document.addEventListener('mouseup', dragEnd);
+        }
+
+        function dragMove(e) {
+            if(!draggedItem) return;
+            let x = e.clientX - diffX;
+            let y = e.clientY - diffY;
+            draggedItem.style.left = x + 'px';
+            draggedItem.style.top = y + 'px';
+        }
+
+        function dragEnd(e) {
+            if(!draggedItem) return;
+            
+            // Check collision with Bins
+            let bins = document.querySelectorAll('.bin');
+            let dropped = false;
+
+            bins.forEach(bin => {
+                const rect = bin.getBoundingClientRect();
+                if(e.clientX > rect.left && e.clientX < rect.right && e.clientY > rect.top && e.clientY < rect.bottom) {
+                    // It's over a bin
+                    let size = parseInt(draggedItem.getAttribute('data-size'));
+                    let currentLoad = parseInt(bin.getAttribute('data-load'));
+                    
+                    if(currentLoad + size <= 100) {
+                        // Fit!
+                        bin.appendChild(draggedItem);
+                        draggedItem.classList.add('packed');
+                        draggedItem.style.position = 'relative';
+                        draggedItem.style.left = '0';
+                        draggedItem.style.top = '0';
+                        
+                        bin.setAttribute('data-load', currentLoad + size);
+                        dropped = true;
+                    } else {
+                        // Bin Full Animation
+                        bin.style.borderColor = '#ff0000';
+                        setTimeout(() => bin.style.borderColor = '#555', 500);
+                    }
+                }
+            });
+
+            if(!dropped && !draggedItem.parentElement.id.includes('bin')) {
+                // If dropped in nowhere, put back in item pool logic roughly
+                document.getElementById('item-pool').appendChild(draggedItem);
+            }
+
+            document.removeEventListener('mousemove', dragMove);
+            document.removeEventListener('mouseup', dragEnd);
+            draggedItem = null;
+        }
+
+        // --- AI SOLVER ---
+        function runAI() {
+            if(items.length === 0) return;
+
+            fetch('/solve_pack', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ items: items })
+            })
+            .then(res => res.json())
+            .then(data => {
+                visualizeSolution(data.bins);
+            });
+        }
+
+        function visualizeSolution(bins) {
+            const binContainer = document.getElementById('bin-container');
+            const pool = document.getElementById('item-pool');
+            
+            // Clear current state
+            binContainer.innerHTML = '<h3 style="width:100%; font-family:\'Orbitron\'; color:#ffbf00; margin-bottom:10px;">MEMORY BANKS (CAPACITY: 100)</h3>';
+            pool.innerHTML = '<h3 style="width:100%; font-family:\'Orbitron\'; color:#ffbf00; margin-bottom:10px;">INCOMING CARGO</h3>';
+
+            bins.forEach((binData, binIndex) => {
+                let binDiv = document.createElement('div');
+                binDiv.className = 'bin';
+                binDiv.id = `bin-${binIndex}`;
+                binDiv.setAttribute('data-load', 100 - binData.space_left); // Approx
+                binContainer.appendChild(binDiv);
+                
+                binData.items.forEach(size => {
+                    let block = document.createElement('div');
+                    block.className = 'block packed';
+                    block.style.height = (size * 3) + 'px';
+                    block.innerText = size;
+                    block.setAttribute('data-size', size);
+                    // AI blocks usually shouldn't be dragged to keep simulation clean, but we can allow it
+                    block.onmousedown = dragStart; 
+                    binDiv.appendChild(block);
+                });
+            });
+        }
+
+        function showGuide() {
+            Swal.fire({
+                title: 'MISSION BRIEF',
+                html: `
+                    <ul style="list-style: none; padding: 0; text-align: left;">
+                        <li style="margin-bottom: 10px;">► <strong>MANUAL MODE:</strong> Drag orange Cargo boxes into the Memory Banks. They stack from the bottom.</li>
+                        <li style="margin-bottom: 10px;">► <strong>CONSTRAINT:</strong> Banks have a limit of 100. If a box fits, it drops. If not, the bin flashes red.</li>
+                        <li style="margin-bottom: 10px;">► <strong>AI ASSIST:</strong> The AI rearranges everything optimally using First-Fit Decreasing.</li>
+                    </ul>
+                `,
+                background: '#0a0a0a', color: '#ffbf00',
+                confirmButtonText: 'ACKNOWLEDGED',
+                confirmButtonColor: '#ffbf00',
+                customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title', content: 'swal-custom-content' }
+            });
+        }
+
+        generateItems();
+    </script>
+
+<!-- ═══════════════════════════════════════════════
+     NEURAL ARENA — UNIVERSAL ENHANCEMENTS v1.0
+     1) Page Transition  2) Btn Particle Burst
+     3) UI Sounds        4) Achievement System
+═══════════════════════════════════════════════ -->
+<div id="na-transition-overlay" style="
+  position:fixed;inset:0;z-index:999999;
+  background:#000;opacity:0;pointer-events:none;
+  transition:opacity .3s ease;
+"></div>
+
+<div id="na-achievement-toast" style="
+  position:fixed;bottom:28px;right:28px;z-index:999998;
+  background:rgba(0,0,0,.92);border:1px solid var(--ac,#ffbf00);
+  border-radius:8px;padding:12px 18px;font-family:'Orbitron',monospace;
+  font-size:.72rem;color:var(--ac,#ffbf00);letter-spacing:2px;
+  box-shadow:0 0 24px var(--ac,#ffbf00);
+  opacity:0;transform:translateY(16px);
+  transition:opacity .35s,transform .35s;pointer-events:none;
+  display:flex;align-items:center;gap:10px;
+"></div>
+
+<script>
+(function(){
+'use strict';
+
+/* ── 0. Detect accent colour from back-btn ─────────────────────────── */
+const accentDetect = () => {
+  const bb = document.querySelector('.back-btn');
+  if(!bb) return '#ffbf00';
+  const s = getComputedStyle(bb);
+  return s.color || '#ffbf00';
+};
+const ACCENT = accentDetect();
+document.documentElement.style.setProperty('--ac', ACCENT);
+
+/* ── 1. PAGE TRANSITION ────────────────────────────────────────────── */
+const overlay = document.getElementById('na-transition-overlay');
+overlay.style.borderColor = ACCENT;
+
+function navigateWithTransition(href){
+  if(!href || href === '#') return;
+  overlay.style.pointerEvents = 'all';
+  overlay.style.opacity = '1';
+  setTimeout(() => { window.location.href = href; }, 310);
+}
+
+document.addEventListener('click', e => {
+  const btn = e.target.closest('.back-btn');
+  if(btn && btn.href){
+    e.preventDefault();
+    playWhoosh();
+    navigateWithTransition(btn.href);
+  }
+}, true);
+
+window.addEventListener('DOMContentLoaded', () => {
+  overlay.style.transition = 'none';
+  overlay.style.opacity = '1';
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      overlay.style.transition = 'opacity .35s ease';
+      overlay.style.opacity = '0';
+    });
+  });
+});
+
+/* ── 2. BACK-BTN HOVER PARTICLE BURST ──────────────────────────────── */
+const bgCv = document.getElementById('neural-bg');
+
+function spawnBurstParticle(x, y){
+  if(!bgCv) return;
+  const angle = Math.random() * Math.PI * 2;
+  const speed = 2 + Math.random() * 3.5;
+  const life  = { v: 1 };
+  const px = x - bgCv.getBoundingClientRect().left;
+  const py = y - bgCv.getBoundingClientRect().top;
+  let vx = Math.cos(angle) * speed;
+  let vy = Math.sin(angle) * speed;
+  let cx = px, cy = py;
+  const ctx2 = bgCv.getContext('2d');
+
+  function draw(){
+    if(life.v <= 0) return;
+    ctx2.save();
+    ctx2.globalAlpha = life.v * 0.8;
+    ctx2.fillStyle = ACCENT;
+    ctx2.shadowColor = ACCENT;
+    ctx2.shadowBlur = 6;
+    ctx2.beginPath();
+    ctx2.arc(cx, cy, 3 * life.v, 0, Math.PI*2);
+    ctx2.fill();
+    ctx2.restore();
+    cx += vx; cy += vy;
+    vx *= 0.92; vy *= 0.92;
+    life.v -= 0.045;
+    requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+document.addEventListener('mouseenter', e => {
+  const btn = e.target.closest('.back-btn');
+  if(!btn) return;
+  const r = btn.getBoundingClientRect();
+  const cx = r.left + r.width/2;
+  const cy = r.top  + r.height/2;
+  for(let i=0; i<8; i++) spawnBurstParticle(cx, cy);
+}, true);
+
+/* ── 3. UI SOUNDS (Web Audio, no files) ────────────────────────────── */
+let _audioCtx = null;
+function getAudioCtx(){
+  if(!_audioCtx) try { _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){}
+  return _audioCtx;
+}
+
+function playWhoosh(){
+  const ac = getAudioCtx(); if(!ac) return;
+  const buf = ac.createBuffer(1, ac.sampleRate * .25, ac.sampleRate);
+  const data = buf.getChannelData(0);
+  for(let i=0;i<data.length;i++) data[i] = (Math.random()*2-1) * (1 - i/data.length);
+  const src = ac.createBufferSource();
+  src.buffer = buf;
+  const f = ac.createBiquadFilter(); f.type='bandpass'; f.frequency.value=800; f.Q.value=0.5;
+  const g = ac.createGain(); g.gain.setValueAtTime(.18, ac.currentTime); g.gain.exponentialRampToValueAtTime(.001, ac.currentTime+.25);
+  src.connect(f); f.connect(g); g.connect(ac.destination);
+  src.start();
+}
+
+function playBeep(freq=1100, dur=.09){
+  const ac = getAudioCtx(); if(!ac) return;
+  const o = ac.createOscillator();
+  const g = ac.createGain();
+  o.type = 'sine';
+  o.frequency.setValueAtTime(freq, ac.currentTime);
+  o.frequency.exponentialRampToValueAtTime(freq*0.6, ac.currentTime+dur);
+  g.gain.setValueAtTime(.08, ac.currentTime);
+  g.gain.exponentialRampToValueAtTime(.001, ac.currentTime+dur);
+  o.connect(g); g.connect(ac.destination);
+  o.start(); o.stop(ac.currentTime+dur);
+}
+
+function playConfirm(){
+  playBeep(880, .06);
+  setTimeout(()=>playBeep(1320,.06), 70);
+}
+
+document.addEventListener('click', e => {
+  const btn = e.target.closest('button');
+  if(!btn) return;
+  if(btn.closest('#na-achievement-toast')) return;
+  const txt = (btn.innerText||'').toLowerCase();
+  if(txt.includes('ai') || txt.includes('run') || txt.includes('solve') ||
+     txt.includes('evolve') || txt.includes('decrypt') || txt.includes('submit') ||
+     txt.includes('recursion') || txt.includes('pilot') || txt.includes('tactical') ||
+     txt.includes('encrypt') || txt.includes('cluster') || txt.includes('pack') ||
+     txt.includes('step') || txt.includes('next') || txt.includes('shield') ||
+     txt.includes('scan') || txt.includes('tour')) {
+    playConfirm();
+  } else if(txt.includes('reset') || txt.includes('restart') || txt.includes('reboot') ||
+            txt.includes('clear') || txt.includes('new') || txt.includes('scramble') ||
+            txt.includes('randomize') || txt.includes('reload') || txt.includes('generate')) {
+    playWhoosh();
+  } else {
+    playBeep(660, .05);
+  }
+}, true);
+
+/* ── 4. ACHIEVEMENT SYSTEM ─────────────────────────────────────────── */
+const toast = document.getElementById('na-achievement-toast');
+let toastTimer = null;
+
+function showAchievement(icon, title, desc){
+  toast.innerHTML = `<span style="font-size:1.4rem">${icon}</span><div><div style="color:var(--ac,#ffbf00);letter-spacing:2px">${title}</div><div style="color:#aaa;font-size:.62rem;margin-top:2px;letter-spacing:1px">${desc}</div></div>`;
+  toast.style.opacity = '1';
+  toast.style.transform = 'translateY(0)';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>{
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(16px)';
+  }, 3500);
+}
+
+function unlockAchievement(key, icon, title, desc){
+  const stored = JSON.parse(localStorage.getItem('na_achievements') || '{}');
+  if(stored[key]) return false;
+  stored[key] = { ts: Date.now(), title, desc };
+  localStorage.setItem('na_achievements', JSON.stringify(stored));
+  showAchievement(icon, title, desc);
+  return true;
+}
+
+window.NA = window.NA || {};
+window.NA.unlockAchievement = unlockAchievement;
+window.NA.playBeep    = playBeep;
+window.NA.playConfirm = playConfirm;
+window.NA.playWhoosh  = playWhoosh;
+window.NA.navigateTo  = navigateWithTransition;
+
+})();
+</script>
+
+<script>
+/* pack achievements */
+(function(){
+  let packAchInit = false;
+  function initPackAch(){
+    if(packAchInit) return; packAchInit = true;
+
+    // First visit
+    window.NA.unlockAchievement('pack_visit','📦','BIN WATCHER','You opened Neon Pack.');
+
+    // Wrap generateItems to detect first pack generated
+    const origGen = window.generateItems;
+    if(typeof origGen === 'function'){
+      window.generateItems = function(){
+        origGen.apply(this, arguments);
+        window.NA.unlockAchievement('pack_firstgen','🎲','FIRST BATCH','Generated your first set of items.');
+      };
+    }
+
+    // Wrap solveAI (AI solve button)
+    const origSolve = window.solveAI || window.aiSolve || window.runAI;
+    if(typeof origSolve === 'function'){
+      const key = origSolve === window.solveAI ? 'solveAI' : origSolve === window.aiSolve ? 'aiSolve' : 'runAI';
+      window[key] = function(){
+        origSolve.apply(this, arguments);
+        window.NA.unlockAchievement('pack_aisolve','🤖','OPTIMIZER','Let the AI pack the bins for you.');
+      };
+    }
+
+    // Button click watcher for AI button
+    document.addEventListener('click', e => {
+      const btn = e.target.closest('button');
+      if(!btn) return;
+      const txt = (btn.innerText||'').toLowerCase();
+      if(txt.includes('ai') || txt.includes('pack') || txt.includes('solve') || txt.includes('optim')){
+        window.NA.unlockAchievement('pack_aisolve','🤖','OPTIMIZER','Let the AI pack the bins for you.');
+      }
+    }, { once: false });
+  }
+
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', initPackAch);
+  } else { initPackAch(); }
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEURAL ARENA | Neon Life</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        /* --- CORE STYLES --- */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: #020202; color: #fff; font-family: 'Rajdhani', sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+            min-height: 100vh; overflow-y: auto; padding-top: 20px; padding-bottom: 50px;
+            user-select: none;
+        }
+        #neural-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; background: radial-gradient(circle at center, #0a1a00 0%, #000 100%); }
+        .scanlines { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2)); background-size: 100% 4px; pointer-events: none; z-index: -1; opacity: 0.3; }
+
+        .back-btn { position: absolute; top: 30px; left: 30px; text-decoration: none; color: #7fff00; font-family: 'Orbitron'; font-size: 1rem; border: 1px solid #7fff00; padding: 10px 20px; border-radius: 5px; transition: 0.3s; background: rgba(127, 255, 0, 0.1); }
+        .back-btn:hover { background-color: #7fff00; color: #000; box-shadow: 0 0 25px #7fff00; }
+
+        h1 { font-family: 'Orbitron'; font-size: 3.5rem; text-shadow: 0 0 20px #7fff00; color: #7fff00; margin-bottom: 10px; margin-top: 40px; }
+        .subtitle { color: #ccc; font-family: 'Orbitron'; margin-bottom: 20px; }
+
+        #lifeCanvas {
+            background: rgba(0, 20, 0, 0.9);
+            border: 2px solid #7fff00;
+            box-shadow: 0 0 40px rgba(127, 255, 0, 0.2);
+            border-radius: 5px;
+            cursor: crosshair;
+        }
+
+        .controls-area { margin-top: 20px; display: flex; gap: 15px; flex-wrap: wrap; justify-content: center; max-width: 800px;}
+        button {
+            padding: 10px 20px; font-family: 'Orbitron'; font-size: 0.9rem; color: #000; background: #7fff00;
+            border: none; cursor: pointer; border-radius: 5px; box-shadow: 0 0 15px #7fff00; transition: 0.3s;
+        }
+        button:hover { transform: scale(1.1); box-shadow: 0 0 30px #7fff00; }
+        
+        .btn-stop { background: #ff3333; color: #fff; box-shadow: 0 0 15px #ff3333; }
+        .btn-stop:hover { box-shadow: 0 0 30px #ff3333; }
+
+        .btn-guide { background: transparent; border: 2px solid #7fff00; color: #7fff00; box-shadow: none; }
+        .btn-guide:hover { background: #7fff00; color: #000; }
+
+        .swal-custom-popup { background: #0a0a0a !important; border: 2px solid #7fff00 !important; }
+        .swal-custom-title { color: #7fff00 !important; font-family: 'Orbitron' !important; }
+        .swal-custom-content { color: #ccc !important; font-family: 'Rajdhani' !important; font-size: 1.1rem; text-align: left;}
+    </style>
+</head>
+<body>
+    <canvas id="neural-bg"></canvas>
+    <div class="scanlines"></div>
+
+    <a href="/" class="back-btn">← DASHBOARD</a>
+    <h1>NEON LIFE</h1>
+    <div class="subtitle">GENERATION: <span id="gen-count">0</span></div>
+
+    <canvas id="lifeCanvas" width="800" height="500"></canvas>
+
+    <div class="controls-area">
+        <button onclick="togglePlay()" id="playBtn">START SIMULATION</button>
+        <button class="btn-guide" onclick="step()">NEXT GEN (STEP)</button>
+        <button class="btn-guide" onclick="clearGrid()">CLEAR</button>
+        <button class="btn-guide" onclick="randomize()">RANDOMIZE</button>
+        <button onclick="spawnGlider()">SPAWN GLIDER</button>
+        <button class="btn-guide" onclick="showGuide()">MISSION BRIEF</button>
+    </div>
+
+    <script>
+        const bgCanvas = document.getElementById('neural-bg'); const bgCtx = bgCanvas.getContext('2d');
+        bgCanvas.width = window.innerWidth; bgCanvas.height = window.innerHeight;
+        let particles=[]; class Particle{constructor(){this.x=Math.random()*bgCanvas.width;this.y=Math.random()*bgCanvas.height;this.size=Math.random()*2;this.speedX=(Math.random()*1.0)-0.5;this.speedY=(Math.random()*1.0)-0.5;this.color='#7fff00';}update(){this.x+=this.speedX;this.y+=this.speedY;if(this.x<0||this.x>bgCanvas.width)this.speedX*=-1;if(this.y<0||this.y>bgCanvas.height)this.speedY*=-1;}draw(){bgCtx.fillStyle=this.color;bgCtx.beginPath();bgCtx.arc(this.x,this.y,this.size,0,Math.PI*2);bgCtx.fill();}}
+        function initBg(){particles=[];for(let i=0;i<60;i++)particles.push(new Particle());}
+        function animateBg(){bgCtx.clearRect(0,0,bgCanvas.width,bgCanvas.height);for(let i=0;i<particles.length;i++){particles[i].update();particles[i].draw();connect(i);}requestAnimationFrame(animateBg);}
+        function connect(a){for(let b=a;b<particles.length;b++){let dist=((particles[a].x-particles[b].x)**2+(particles[a].y-particles[b].y)**2);if(dist<(bgCanvas.width/7)*(bgCanvas.height/7)){bgCtx.strokeStyle='rgba(127, 255, 0,'+(1-dist/25000)+')';bgCtx.lineWidth=1;bgCtx.beginPath();bgCtx.moveTo(particles[a].x,particles[a].y);bgCtx.lineTo(particles[b].x,particles[b].y);bgCtx.stroke();}}}
+        window.addEventListener('resize',()=>{bgCanvas.width=window.innerWidth;bgCanvas.height=window.innerHeight;initBg();});initBg(); animateBg();
+    </script>
+
+    <script>
+        const canvas = document.getElementById('lifeCanvas');
+        const ctx = canvas.getContext('2d');
+        const CELL_SIZE = 10;
+        const COLS = canvas.width / CELL_SIZE;
+        const ROWS = canvas.height / CELL_SIZE;
+        
+        let grid = [];
+        let isRunning = false;
+        let generation = 0;
+        let intervalId = null;
+        let isDrawing = false;
+
+        function createGrid() {
+            let arr = new Array(ROWS);
+            for(let i=0; i<arr.length; i++) {
+                arr[i] = new Array(COLS).fill(0);
+            }
+            return arr;
+        }
+
+        grid = createGrid();
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#7fff00';
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#7fff00';
+            
+            for(let r=0; r<ROWS; r++) {
+                for(let c=0; c<COLS; c++) {
+                    if(grid[r][c] === 1) {
+                        ctx.fillRect(c * CELL_SIZE, r * CELL_SIZE, CELL_SIZE-1, CELL_SIZE-1);
+                    }
+                }
+            }
+            ctx.shadowBlur = 0;
+            document.getElementById('gen-count').innerText = generation;
+        }
+
+        function togglePlay() {
+            if(isRunning) {
+                clearInterval(intervalId);
+                isRunning = false;
+                document.getElementById('playBtn').innerText = "START SIMULATION";
+                document.getElementById('playBtn').classList.remove('btn-stop');
+            } else {
+                intervalId = setInterval(step, 100);
+                isRunning = true;
+                document.getElementById('playBtn').innerText = "STOP SIMULATION";
+                document.getElementById('playBtn').classList.add('btn-stop');
+            }
+        }
+
+        function step() {
+            fetch('/evolve_life', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ grid: grid })
+            })
+            .then(res => res.json())
+            .then(data => {
+                grid = data.grid;
+                generation++;
+                draw();
+            });
+        }
+
+        function randomize() {
+            for(let r=0; r<ROWS; r++) {
+                for(let c=0; c<COLS; c++) {
+                    grid[r][c] = Math.random() > 0.85 ? 1 : 0; // Sparse random
+                }
+            }
+            generation = 0;
+            draw();
+        }
+
+        function clearGrid() {
+            grid = createGrid();
+            generation = 0;
+            if(isRunning) togglePlay();
+            draw();
+        }
+
+        function spawnGlider() {
+            // Standard Glider pattern
+            let r = Math.floor(ROWS/2);
+            let c = Math.floor(COLS/2);
+            grid[r][c+1] = 1;
+            grid[r+1][c+2] = 1;
+            grid[r+2][c] = 1;
+            grid[r+2][c+1] = 1;
+            grid[r+2][c+2] = 1;
+            draw();
+        }
+
+        // MOUSE INTERACTION
+        function getMousePos(e) {
+            const rect = canvas.getBoundingClientRect();
+            return {
+                c: Math.floor((e.clientX - rect.left) / CELL_SIZE),
+                r: Math.floor((e.clientY - rect.top) / CELL_SIZE)
+            };
+        }
+
+        canvas.addEventListener('mousedown', (e) => {
+            isDrawing = true;
+            paint(e);
+        });
+        canvas.addEventListener('mousemove', (e) => {
+            if(isDrawing) paint(e);
+        });
+        window.addEventListener('mouseup', () => isDrawing = false);
+
+        function paint(e) {
+            const pos = getMousePos(e);
+            if(pos.r >= 0 && pos.r < ROWS && pos.c >= 0 && pos.c < COLS) {
+                grid[pos.r][pos.c] = 1;
+                draw();
+            }
+        }
+
+        function showGuide() {
+            Swal.fire({
+                title: 'MISSION BRIEF',
+                html: `
+                    <ul style="list-style: none; padding: 0; text-align: left;">
+                        <li style="margin-bottom: 10px;">► <strong>SIMULATION:</strong> Conway's Game of Life. Cells live or die based on density.</li>
+                        <li style="margin-bottom: 10px;">► <strong>RULES:</strong> 
+                            <br>1. Underpopulation (<2 neighbors) -> Dies.
+                            <br>2. Overpopulation (>3 neighbors) -> Dies.
+                            <br>3. Reproduction (3 neighbors) -> Becomes Alive.
+                        </li>
+                        <li style="margin-bottom: 10px;">► <strong>INTERACT:</strong> Click and drag to draw cells. Use "Next Gen" to calculate one step using the Python backend.</li>
+                    </ul>
+                `,
+                background: '#0a0a0a', color: '#7fff00',
+                confirmButtonText: 'ACKNOWLEDGED',
+                confirmButtonColor: '#7fff00',
+                customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title', content: 'swal-custom-content' }
+            });
+        }
+
+        // Start with a glider gun or random
+        spawnGlider();
+        draw();
+    </script>
+
+<!-- ═══════════════════════════════════════════════
+     NEURAL ARENA — UNIVERSAL ENHANCEMENTS v1.0
+     1) Page Transition  2) Btn Particle Burst
+     3) UI Sounds        4) Achievement System
+═══════════════════════════════════════════════ -->
+<div id="na-transition-overlay" style="
+  position:fixed;inset:0;z-index:999999;
+  background:#000;opacity:0;pointer-events:none;
+  transition:opacity .3s ease;
+"></div>
+
+<div id="na-achievement-toast" style="
+  position:fixed;bottom:28px;right:28px;z-index:999998;
+  background:rgba(0,0,0,.92);border:1px solid var(--ac,#00ffcc);
+  border-radius:8px;padding:12px 18px;font-family:'Orbitron',monospace;
+  font-size:.72rem;color:var(--ac,#00ffcc);letter-spacing:2px;
+  box-shadow:0 0 24px var(--ac,#00ffcc);
+  opacity:0;transform:translateY(16px);
+  transition:opacity .35s,transform .35s;pointer-events:none;
+  display:flex;align-items:center;gap:10px;
+"></div>
+
+<script>
+(function(){
+'use strict';
+
+/* ── 0. Detect accent colour from back-btn ─────────────────────────── */
+const accentDetect = () => {
+  const bb = document.querySelector('.back-btn');
+  if(!bb) return '#00ffcc';
+  const s = getComputedStyle(bb);
+  return s.color || '#00ffcc';
+};
+const ACCENT = accentDetect();
+document.documentElement.style.setProperty('--ac', ACCENT);
+
+/* ── 1. PAGE TRANSITION ────────────────────────────────────────────── */
+const overlay = document.getElementById('na-transition-overlay');
+overlay.style.borderColor = ACCENT;
+
+function navigateWithTransition(href){
+  if(!href || href === '#') return;
+  overlay.style.pointerEvents = 'all';
+  overlay.style.opacity = '1';
+  setTimeout(() => { window.location.href = href; }, 310);
+}
+
+// Intercept back-btn clicks
+document.addEventListener('click', e => {
+  const btn = e.target.closest('.back-btn');
+  if(btn && btn.href){
+    e.preventDefault();
+    playWhoosh();
+    navigateWithTransition(btn.href);
+  }
+}, true);
+
+// Fade-in on arrival
+window.addEventListener('DOMContentLoaded', () => {
+  overlay.style.transition = 'none';
+  overlay.style.opacity = '1';
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      overlay.style.transition = 'opacity .35s ease';
+      overlay.style.opacity = '0';
+    });
+  });
+});
+
+/* ── 2. BACK-BTN HOVER PARTICLE BURST ──────────────────────────────── */
+const bgCv = document.getElementById('neural-bg');
+
+function spawnBurstParticle(x, y){
+  if(!bgCv) return;
+  const angle = Math.random() * Math.PI * 2;
+  const speed = 2 + Math.random() * 3.5;
+  const life  = { v: 1 };
+  const px = x - bgCv.getBoundingClientRect().left;
+  const py = y - bgCv.getBoundingClientRect().top;
+  let vx = Math.cos(angle) * speed;
+  let vy = Math.sin(angle) * speed;
+  let cx = px, cy = py;
+  const ctx2 = bgCv.getContext('2d');
+
+  function draw(){
+    if(life.v <= 0) return;
+    ctx2.save();
+    ctx2.globalAlpha = life.v * 0.8;
+    ctx2.fillStyle = ACCENT;
+    ctx2.shadowColor = ACCENT;
+    ctx2.shadowBlur = 6;
+    ctx2.beginPath();
+    ctx2.arc(cx, cy, 3 * life.v, 0, Math.PI*2);
+    ctx2.fill();
+    ctx2.restore();
+    cx += vx; cy += vy;
+    vx *= 0.92; vy *= 0.92;
+    life.v -= 0.045;
+    requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+document.addEventListener('mouseenter', e => {
+  const btn = e.target.closest('.back-btn');
+  if(!btn) return;
+  const r = btn.getBoundingClientRect();
+  const cx = r.left + r.width/2;
+  const cy = r.top  + r.height/2;
+  for(let i=0; i<8; i++) spawnBurstParticle(cx, cy);
+}, true);
+
+/* ── 3. UI SOUNDS (Web Audio, no files) ────────────────────────────── */
+let _audioCtx = null;
+function getAudioCtx(){
+  if(!_audioCtx) try { _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){}
+  return _audioCtx;
+}
+
+function playWhoosh(){
+  const ac = getAudioCtx(); if(!ac) return;
+  const buf = ac.createBuffer(1, ac.sampleRate * .25, ac.sampleRate);
+  const data = buf.getChannelData(0);
+  for(let i=0;i<data.length;i++) data[i] = (Math.random()*2-1) * (1 - i/data.length);
+  const src = ac.createBufferSource();
+  src.buffer = buf;
+  const f = ac.createBiquadFilter(); f.type='bandpass'; f.frequency.value=800; f.Q.value=0.5;
+  const g = ac.createGain(); g.gain.setValueAtTime(.18, ac.currentTime); g.gain.exponentialRampToValueAtTime(.001, ac.currentTime+.25);
+  src.connect(f); f.connect(g); g.connect(ac.destination);
+  src.start();
+}
+
+function playBeep(freq=1100, dur=.09){
+  const ac = getAudioCtx(); if(!ac) return;
+  const o = ac.createOscillator();
+  const g = ac.createGain();
+  o.type = 'sine';
+  o.frequency.setValueAtTime(freq, ac.currentTime);
+  o.frequency.exponentialRampToValueAtTime(freq*0.6, ac.currentTime+dur);
+  g.gain.setValueAtTime(.08, ac.currentTime);
+  g.gain.exponentialRampToValueAtTime(.001, ac.currentTime+dur);
+  o.connect(g); g.connect(ac.destination);
+  o.start(); o.stop(ac.currentTime+dur);
+}
+
+function playConfirm(){
+  playBeep(880, .06);
+  setTimeout(()=>playBeep(1320,.06), 70);
+}
+
+// Wire sounds to AI / action buttons (exclude back-btn — already has whoosh)
+document.addEventListener('click', e => {
+  const btn = e.target.closest('button');
+  if(!btn) return;
+  if(btn.closest('#na-achievement-toast')) return;
+  const txt = (btn.innerText||'').toLowerCase();
+  // whoosh for nav/reset, confirm beep for AI/action
+  if(txt.includes('ai') || txt.includes('run') || txt.includes('solve') ||
+     txt.includes('evolve') || txt.includes('decrypt') || txt.includes('submit') ||
+     txt.includes('recursion') || txt.includes('pilot') || txt.includes('tactical') ||
+     txt.includes('encrypt') || txt.includes('cluster') || txt.includes('paint') ||
+     txt.includes('step') || txt.includes('next') || txt.includes('shield') ||
+     txt.includes('scan') || txt.includes('tour')) {
+    playConfirm();
+  } else if(txt.includes('reset') || txt.includes('restart') || txt.includes('reboot') ||
+            txt.includes('clear') || txt.includes('new') || txt.includes('scramble') ||
+            txt.includes('randomize') || txt.includes('reload')) {
+    playWhoosh();
+  } else {
+    playBeep(660, .05); // generic click tick
+  }
+}, true);
+
+/* ── 4. ACHIEVEMENT SYSTEM ─────────────────────────────────────────── */
+const toast = document.getElementById('na-achievement-toast');
+let toastTimer = null;
+
+function showAchievement(icon, title, desc){
+  toast.innerHTML = `<span style="font-size:1.4rem">${icon}</span><div><div style="color:var(--ac,#00ffcc);letter-spacing:2px">${title}</div><div style="color:#aaa;font-size:.62rem;margin-top:2px;letter-spacing:1px">${desc}</div></div>`;
+  toast.style.opacity = '1';
+  toast.style.transform = 'translateY(0)';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>{
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(16px)';
+  }, 3500);
+}
+
+function unlockAchievement(key, icon, title, desc){
+  const stored = JSON.parse(localStorage.getItem('na_achievements') || '{}');
+  if(stored[key]) return false; // already earned
+  stored[key] = { ts: Date.now(), title, desc };
+  localStorage.setItem('na_achievements', JSON.stringify(stored));
+  showAchievement(icon, title, desc);
+  return true;
+}
+
+// Expose globally so per-game code can call it
+window.NA = window.NA || {};
+window.NA.unlockAchievement = unlockAchievement;
+window.NA.playBeep     = playBeep;
+window.NA.playConfirm  = playConfirm;
+window.NA.playWhoosh   = playWhoosh;
+window.NA.navigateTo   = navigateWithTransition;
+
+})();
+</script>
+
+
+<script>
+/* life achievements */
+(function(){
+  let genCount = 0;
+  const origStep = window.step;
+  if(origStep) window.step = function(){
+    genCount++;
+    if(genCount === 1)   window.NA.unlockAchievement('life_first','🦠','FIRST GEN','Simulated first generation!');
+    if(genCount >= 50)   window.NA.unlockAchievement('life_50','⚡','EVOLVING','Reached 50 generations!');
+    if(genCount >= 100)  window.NA.unlockAchievement('life_100','🏆','LIFE MASTER','Reached 100 generations!');
+    origStep();
+  };
+  const origGlider = window.spawnGlider;
+  if(origGlider) window.spawnGlider = function(){
+    window.NA.unlockAchievement('life_glider','🛸','GLIDER DEPLOYED','Spawned a Glider pattern!');
+    origGlider();
+  };
+})();
+</script>
+
+</body>
+</html>

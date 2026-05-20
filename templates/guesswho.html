@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEURAL ARENA | Neon Prophet</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: #020202; color: #fff; font-family: 'Rajdhani', sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            min-height: 100vh; overflow-y: auto; padding-top: 20px; padding-bottom: 50px;
+            user-select: none;
+        }
+        #neural-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; background: radial-gradient(circle at center, #1a1a1a 0%, #000 100%); }
+        .scanlines { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2)); background-size: 100% 4px; pointer-events: none; z-index: -1; opacity: 0.3; }
+
+        /* ── PAGE TRANSITION OVERLAY ── */
+        #page-transition {
+            position: fixed; inset: 0; z-index: 99999;
+            background: #ffffff;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        #page-transition.active { opacity: 1; pointer-events: all; }
+
+        .back-btn {
+            position: absolute; top: 30px; left: 30px; text-decoration: none;
+            color: #fff; font-family: 'Orbitron'; font-size: 1rem;
+            border: 1px solid #fff; padding: 10px 20px; border-radius: 5px;
+            transition: 0.3s; background: rgba(255, 255, 255, 0.1);
+            cursor: pointer;
+        }
+        .back-btn:hover { background-color: #fff; color: #000; box-shadow: 0 0 25px #fff; }
+
+        h1 { font-family: 'Orbitron'; font-size: 3.5rem; text-shadow: 0 0 20px #fff; color: #fff; margin-bottom: 40px; }
+
+        .terminal-box {
+            width: 700px; min-height: 300px;
+            background: rgba(10, 10, 10, 0.9);
+            border: 2px solid #fff;
+            box-shadow: 0 0 40px rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 40px;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            position: relative;
+        }
+
+        .question-text {
+            font-family: 'Orbitron'; font-size: 1.8rem; color: #fff;
+            text-align: center; line-height: 1.5; min-height: 100px;
+            text-shadow: 0 0 10px #fff;
+        }
+
+        .options-area {
+            margin-top: 40px; display: flex; gap: 40px; opacity: 0; transition: opacity 0.5s;
+        }
+        .options-area.visible { opacity: 1; }
+
+        .btn-option {
+            padding: 15px 50px; font-family: 'Orbitron'; font-size: 1.2rem;
+            color: #000; background: #fff; border: none; cursor: pointer;
+            border-radius: 5px; box-shadow: 0 0 20px #fff; transition: 0.3s;
+        }
+        .btn-option:hover { transform: scale(1.1); box-shadow: 0 0 40px #fff; background: #e0e0e0; }
+        .btn-no { background: #333; color: #fff; border: 1px solid #fff; box-shadow: none; }
+        .btn-no:hover { background: #fff; color: #000; box-shadow: 0 0 20px #fff; }
+
+        .character-grid {
+            margin-top: 30px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; max-width: 800px;
+        }
+        .char-tag {
+            background: rgba(255,255,255,0.1); padding: 5px 10px; font-size: 0.8rem;
+            border: 1px solid #555; color: #777; border-radius: 3px;
+        }
+
+        .cursor { display: inline-block; width: 10px; height: 1.8rem; background: #fff; animation: blink 1s infinite; margin-left: 5px; vertical-align: bottom; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+        /* Achievement toast */
+        #achievement-toast {
+            position: fixed; bottom: 30px; right: 30px; z-index: 9000;
+            background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.5);
+            border-radius: 8px; padding: 14px 20px; min-width: 280px;
+            font-family: 'Orbitron'; font-size: 0.75rem; color: #fff;
+            display: flex; align-items: center; gap: 12px;
+            transform: translateX(120%); transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            backdrop-filter: blur(12px);
+        }
+        #achievement-toast.show { transform: translateX(0); }
+        #achievement-toast .ach-icon { font-size: 1.6rem; }
+        #achievement-toast .ach-title { color: #fff; margin-bottom: 2px; }
+        #achievement-toast .ach-sub { color: rgba(255,255,255,0.5); font-size: 0.6rem; letter-spacing: 2px; }
+
+        .swal-custom-popup { background: #0a0a0a !important; border: 2px solid #fff !important; }
+        .swal-custom-title { color: #fff !important; font-family: 'Orbitron' !important; }
+    </style>
+</head>
+<body>
+    <canvas id="neural-bg"></canvas>
+    <div class="scanlines"></div>
+    <div id="page-transition"></div>
+
+    <!-- Achievement Toast -->
+    <div id="achievement-toast">
+        <div class="ach-icon" id="ach-icon">🏆</div>
+        <div class="ach-body">
+            <div class="ach-title" id="ach-title">ACHIEVEMENT UNLOCKED</div>
+            <div class="ach-sub" id="ach-sub">LOADING...</div>
+        </div>
+    </div>
+
+    <a class="back-btn" id="back-btn">← DASHBOARD</a>
+    <h1>NEON PROPHET</h1>
+
+    <div class="terminal-box">
+        <div class="question-text" id="qText">INITIALIZING NEURAL LINK...</div>
+        <div class="options-area" id="options">
+            <button class="btn-option" onclick="answer('yes')">YES</button>
+            <button class="btn-option btn-no" onclick="answer('no')">NO</button>
+        </div>
+    </div>
+
+    <div class="character-grid">
+        <div class="char-tag">THE SOLDIER</div>
+        <div class="char-tag">THE NINJA</div>
+        <div class="char-tag">THE HACKER</div>
+        <div class="char-tag">THE CIVILIAN</div>
+        <div class="char-tag">THE TERMINATOR</div>
+        <div class="char-tag">THE BUTLER BOT</div>
+        <div class="char-tag">THE DRONE</div>
+        <div class="char-tag">THE AI CORE</div>
+    </div>
+
+    <script>
+        // ── WEB AUDIO ──────────────────────────────────────────
+        let audioCtx = null;
+        function getAudio() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            return audioCtx;
+        }
+
+        function playWhoosh() {
+            try {
+                const ctx = getAudio();
+                const buf = ctx.createBuffer(1, ctx.sampleRate * 0.25, ctx.sampleRate);
+                const data = buf.getChannelData(0);
+                for (let i = 0; i < data.length; i++) {
+                    data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / data.length, 2);
+                }
+                const src = ctx.createBufferSource();
+                const filter = ctx.createBiquadFilter();
+                filter.type = 'bandpass'; filter.frequency.value = 900;
+                const gain = ctx.createGain();
+                gain.gain.setValueAtTime(0.18, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+                src.buffer = buf;
+                src.connect(filter); filter.connect(gain); gain.connect(ctx.destination);
+                src.start();
+            } catch(e) {}
+        }
+
+        function playBeep(freq = 880, dur = 0.1, type = 'sine') {
+            try {
+                const ctx = getAudio();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.frequency.value = freq; osc.type = type;
+                gain.gain.setValueAtTime(0.06, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+                osc.connect(gain); gain.connect(ctx.destination);
+                osc.start(); osc.stop(ctx.currentTime + dur);
+            } catch(e) {}
+        }
+
+        function playYesSound() {
+            playBeep(523, 0.07); setTimeout(() => playBeep(784, 0.1), 80);
+        }
+        function playNoSound() {
+            playBeep(400, 0.07, 'sawtooth'); setTimeout(() => playBeep(300, 0.1, 'sawtooth'), 80);
+        }
+        function playCorrectSound() {
+            [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => playBeep(f, 0.15), i * 80));
+        }
+        function playAchievementSound() {
+            [440, 554, 659, 880].forEach((f, i) => setTimeout(() => playBeep(f, 0.14), i * 70));
+        }
+
+        // ── PAGE TRANSITION ────────────────────────────────────
+        const overlay = document.getElementById('page-transition');
+        document.getElementById('back-btn').addEventListener('click', (e) => {
+            e.preventDefault();
+            playWhoosh();
+            overlay.classList.add('active');
+            setTimeout(() => { window.location.href = '/'; }, 320);
+        });
+
+        // ── BACKGROUND + BURST PARTICLES ───────────────────────
+        const bgCanvas = document.getElementById('neural-bg');
+        const bgCtx = bgCanvas.getContext('2d');
+        bgCanvas.width = window.innerWidth; bgCanvas.height = window.innerHeight;
+
+        let burstParticles = [];
+
+        document.getElementById('back-btn').addEventListener('mouseenter', () => {
+            const rect = document.getElementById('back-btn').getBoundingClientRect();
+            const cx = rect.left + rect.width / 2;
+            const cy = rect.top + rect.height / 2;
+            for (let i = 0; i < 8; i++) {
+                const angle = (i / 8) * Math.PI * 2;
+                const speed = 2.5 + Math.random() * 2.5;
+                burstParticles.push({
+                    x: cx, y: cy,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    life: 1, size: 4 + Math.random() * 3
+                });
+            }
+        });
+
+        let bgParticles = [];
+        class BgParticle {
+            constructor() {
+                this.x = Math.random() * bgCanvas.width;
+                this.y = Math.random() * bgCanvas.height;
+                this.size = Math.random() * 2;
+                this.speedX = (Math.random() * 0.5) - 0.25;
+                this.speedY = (Math.random() * 0.5) - 0.25;
+            }
+            update() {
+                this.x += this.speedX; this.y += this.speedY;
+                if (this.x < 0 || this.x > bgCanvas.width) this.speedX *= -1;
+                if (this.y < 0 || this.y > bgCanvas.height) this.speedY *= -1;
+            }
+            draw() {
+                bgCtx.fillStyle = '#ffffff';
+                bgCtx.beginPath(); bgCtx.arc(this.x, this.y, this.size, 0, Math.PI * 2); bgCtx.fill();
+            }
+        }
+
+        function initBg() {
+            bgParticles = [];
+            for (let i = 0; i < 60; i++) bgParticles.push(new BgParticle());
+        }
+
+        function animateBg() {
+            bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
+            for (let i = 0; i < bgParticles.length; i++) {
+                bgParticles[i].update(); bgParticles[i].draw();
+                for (let b = i; b < bgParticles.length; b++) {
+                    const dist = (bgParticles[i].x - bgParticles[b].x) ** 2 + (bgParticles[i].y - bgParticles[b].y) ** 2;
+                    if (dist < (bgCanvas.width / 7) * (bgCanvas.height / 7)) {
+                        bgCtx.strokeStyle = `rgba(255, 255, 255, ${1 - dist / 25000})`;
+                        bgCtx.lineWidth = 1;
+                        bgCtx.beginPath();
+                        bgCtx.moveTo(bgParticles[i].x, bgParticles[i].y);
+                        bgCtx.lineTo(bgParticles[b].x, bgParticles[b].y);
+                        bgCtx.stroke();
+                    }
+                }
+            }
+            // burst particles
+            burstParticles = burstParticles.filter(p => p.life > 0);
+            for (const p of burstParticles) {
+                p.x += p.vx; p.y += p.vy; p.vy += 0.12; p.life -= 0.04;
+                bgCtx.globalAlpha = Math.max(0, p.life);
+                bgCtx.fillStyle = '#ffffff';
+                bgCtx.beginPath(); bgCtx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2); bgCtx.fill();
+                bgCtx.globalAlpha = 1;
+            }
+            requestAnimationFrame(animateBg);
+        }
+
+        window.addEventListener('resize', () => {
+            bgCanvas.width = window.innerWidth; bgCanvas.height = window.innerHeight; initBg();
+        });
+        initBg(); animateBg();
+
+        // ── ACHIEVEMENT SYSTEM ─────────────────────────────────
+        const ACHIEVEMENTS = {
+            first_guess: { icon: '🔮', title: 'FIRST READING', sub: 'COMPLETED FIRST PROPHECY' },
+            ai_correct: { icon: '🎯', title: 'NEURAL HIT', sub: 'AI GUESSED CORRECTLY' },
+            three_sessions: { icon: '🧠', title: 'MIND READER', sub: 'PLAYED 3 SESSIONS' },
+            fast_confirm: { icon: '⚡', title: 'INSTANT THOUGHT', sub: 'ANSWERED IN UNDER 5s' },
+        };
+
+        function unlockAchievement(key) {
+            const unlocked = JSON.parse(localStorage.getItem('prophet_achievements') || '{}');
+            if (unlocked[key]) return;
+            unlocked[key] = Date.now();
+            localStorage.setItem('prophet_achievements', JSON.stringify(unlocked));
+            showAchievementToast(ACHIEVEMENTS[key]);
+            playAchievementSound();
+        }
+
+        function showAchievementToast(ach) {
+            const toast = document.getElementById('achievement-toast');
+            document.getElementById('ach-icon').textContent = ach.icon;
+            document.getElementById('ach-title').textContent = ach.title;
+            document.getElementById('ach-sub').textContent = ach.sub;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3500);
+        }
+
+        // Track sessions
+        let sessionCount = parseInt(localStorage.getItem('prophet_sessions') || '0') + 1;
+        localStorage.setItem('prophet_sessions', sessionCount);
+        if (sessionCount >= 3) setTimeout(() => unlockAchievement('three_sessions'), 1500);
+
+        // ── GAME LOGIC ─────────────────────────────────────────
+        let currentNode = null;
+        let isTyping = false;
+        let questionStartTime = 0;
+
+        function startSession() {
+            fetch('/query_tree', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ answer: null })
+            })
+            .then(res => res.json())
+            .then(data => {
+                currentNode = data.node;
+                typeWriter(data.text);
+                questionStartTime = Date.now();
+            });
+        }
+
+        function answer(response) {
+            if (isTyping) return;
+
+            // Achievement: fast answer
+            if ((Date.now() - questionStartTime) < 5000) unlockAchievement('fast_confirm');
+
+            // Play appropriate sound
+            if (response === 'yes') playYesSound();
+            else playNoSound();
+
+            document.getElementById('options').classList.remove('visible');
+
+            fetch('/query_tree', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ node: currentNode, answer: response })
+            })
+            .then(res => res.json())
+            .then(data => {
+                currentNode = data.node;
+                questionStartTime = Date.now();
+                if (data.is_guess) {
+                    typeWriter(data.text, true);
+                } else {
+                    typeWriter(data.text);
+                }
+            });
+        }
+
+        function typeWriter(text, isEnd = false) {
+            isTyping = true;
+            const el = document.getElementById('qText');
+            el.innerHTML = '<span class="cursor"></span>';
+            let i = 0;
+            const speed = 30;
+
+            function type() {
+                if (i < text.length) {
+                    el.innerHTML = text.substring(0, i + 1) + '<span class="cursor"></span>';
+                    i++;
+                    setTimeout(type, speed);
+                } else {
+                    isTyping = false;
+                    if (isEnd) {
+                        setTimeout(() => showResult(text), 500);
+                    } else {
+                        document.getElementById('options').classList.add('visible');
+                    }
+                }
+            }
+            type();
+        }
+
+        function showResult(text) {
+            Swal.fire({
+                title: text,
+                text: "Was the Neural Network correct?",
+                background: '#0a0a0a', color: '#fff',
+                showCancelButton: true,
+                confirmButtonText: 'YES (Correct)',
+                cancelButtonText: 'NO (Wrong)',
+                confirmButtonColor: '#fff',
+                cancelButtonColor: '#333',
+                customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title' }
+            }).then((result) => {
+                // Write to arena achievements
+                const arenaAch = JSON.parse(localStorage.getItem('na_achievements') || '{}');
+                arenaAch['prophet_played'] = Date.now();
+                localStorage.setItem('na_achievements', JSON.stringify(arenaAch));
+
+                unlockAchievement('first_guess');
+
+                if (result.isConfirmed) {
+                    playCorrectSound();
+                    unlockAchievement('ai_correct');
+
+                    Swal.fire({
+                        title: "PREDICTION VERIFIED",
+                        icon: "success",
+                        background: '#0a0a0a', color: '#fff',
+                        confirmButtonColor: '#fff',
+                        customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title' }
+                    }).then(() => location.reload());
+                } else {
+                    playNoSound();
+                    Swal.fire({
+                        title: "RECALIBRATING...",
+                        text: "Data anomaly detected.",
+                        icon: "info",
+                        background: '#0a0a0a', color: '#fff',
+                        confirmButtonColor: '#fff',
+                        customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title' }
+                    }).then(() => location.reload());
+                }
+            });
+        }
+
+        // Initialize
+        setTimeout(startSession, 1000);
+    </script>
+</body>
+</html>

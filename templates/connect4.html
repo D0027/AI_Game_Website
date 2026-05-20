@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEURAL ARENA | Neon Connect</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        /* --- CORE STYLES --- */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: #020202; color: #fff; font-family: 'Rajdhani', sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            min-height: 100vh; overflow: hidden;
+        }
+        #neural-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; background: radial-gradient(circle at center, #0a0a0a 0%, #000 100%); }
+        .scanlines { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2)); background-size: 100% 4px; pointer-events: none; z-index: -1; opacity: 0.3; }
+
+        .back-btn { position: absolute; top: 30px; left: 30px; text-decoration: none; color: #ffcc00; font-family: 'Orbitron'; font-size: 1rem; border: 1px solid #ffcc00; padding: 10px 20px; border-radius: 5px; transition: 0.3s; background: rgba(255, 204, 0, 0.1); }
+        .back-btn:hover { background-color: #ffcc00; color: #000; box-shadow: 0 0 25px #ffcc00; }
+
+        h1 { font-family: 'Orbitron'; font-size: 3.5rem; text-shadow: 0 0 20px #ffcc00; color: #ffcc00; margin-bottom: 10px; }
+        #status { font-size: 1.5rem; color: #fff; margin-bottom: 20px; font-family: 'Orbitron'; letter-spacing: 2px; }
+
+        /* --- CONNECT 4 BOARD --- */
+        .c4-board {
+            display: grid;
+            grid-template-columns: repeat(7, 60px);
+            grid-template-rows: repeat(6, 60px);
+            gap: 10px;
+            background: rgba(30, 30, 30, 0.8);
+            padding: 15px;
+            border: 2px solid #ffcc00;
+            border-radius: 15px;
+            box-shadow: 0 0 50px rgba(255, 204, 0, 0.3);
+            backdrop-filter: blur(10px);
+        }
+
+        .slot {
+            width: 60px; height: 60px;
+            background-color: #0a0a0a;
+            border-radius: 50%;
+            border: 1px solid #333;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            box-shadow: inset 0 0 10px #000;
+        }
+        .slot:hover { border-color: #ffcc00; box-shadow: 0 0 15px rgba(255, 204, 0, 0.3); }
+
+        /* PIECES */
+        .piece {
+            width: 100%; height: 100%;
+            border-radius: 50%;
+            transform: translateY(-300px); /* Start above */
+            animation: dropIn 0.5s forwards ease-in;
+        }
+        .p1 { background: #ffcc00; box-shadow: 0 0 20px #ffcc00; } /* Player (Yellow) */
+        .p2 { background: #ff0055; box-shadow: 0 0 20px #ff0055; } /* AI (Red) */
+
+        @keyframes dropIn { to { transform: translateY(0); } }
+
+        .restart-btn { margin-top: 30px; padding: 10px 30px; font-family: 'Orbitron'; background: transparent; color: #ffcc00; border: 2px solid #ffcc00; font-size: 1.2rem; cursor: pointer; transition: 0.3s; }
+        .restart-btn:hover { background: #ffcc00; color: #000; box-shadow: 0 0 30px #ffcc00; }
+        
+        /* Popup Styles */
+        .swal-custom-popup { background: #0a0a0a !important; border: 2px solid #ffcc00 !important; }
+        .swal-custom-title { color: #ffcc00 !important; font-family: 'Orbitron' !important; }
+    </style>
+</head>
+<body>
+    <canvas id="neural-bg"></canvas>
+    <div class="scanlines"></div>
+
+    <a href="/" class="back-btn">← DASHBOARD</a>
+    <h1>NEON CONNECT</h1>
+    <div id="status">YOUR TURN (YELLOW)</div>
+
+    <div class="c4-board" id="board">
+        </div>
+
+    <button class="restart-btn" onclick="location.reload()">RESET SYSTEM</button>
+
+    <script>
+        const canvas = document.getElementById('neural-bg'); const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+        let particlesArray; class Particle { constructor() { this.x = Math.random() * canvas.width; this.y = Math.random() * canvas.height; this.size = Math.random() * 2; this.speedX = (Math.random() * 1.5) - 0.75; this.speedY = (Math.random() * 1.5) - 0.75; this.color = '#ffcc00'; } update() { this.x += this.speedX; this.y += this.speedY; if (this.x < 0 || this.x > canvas.width) this.speedX *= -1; if (this.y < 0 || this.y > canvas.height) this.speedY *= -1; } draw() { ctx.fillStyle = this.color; ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fill(); } }
+        function init() { particlesArray = []; let numberOfParticles = (canvas.height * canvas.width) / 15000; for (let i = 0; i < numberOfParticles; i++) { particlesArray.push(new Particle()); } }
+        function animate() { ctx.clearRect(0, 0, canvas.width, canvas.height); for (let i = 0; i < particlesArray.length; i++) { particlesArray[i].update(); particlesArray[i].draw(); connect(i); } requestAnimationFrame(animate); }
+        function connect(a) { for (let b = a; b < particlesArray.length; b++) { let distance = ((particlesArray[a].x - particlesArray[b].x) * (particlesArray[a].x - particlesArray[b].x)) + ((particlesArray[a].y - particlesArray[b].y) * (particlesArray[a].y - particlesArray[b].y)); if (distance < (canvas.width/9) * (canvas.height/9)) { let opacityValue = 0.8 - (distance / 20000); ctx.strokeStyle = 'rgba(255, 204, 0,' + opacityValue + ')'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(particlesArray[a].x, particlesArray[a].y); ctx.lineTo(particlesArray[b].x, particlesArray[b].y); ctx.stroke(); } } }
+        window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; init(); }); init(); animate();
+    </script>
+
+    <script>
+        const rows = 6;
+        const cols = 7;
+        let boardState = Array(rows).fill().map(() => Array(cols).fill(0)); // 0=Empty, 1=Player, 2=AI
+        let gameActive = true;
+
+        // Generate Grid
+        const boardDiv = document.getElementById('board');
+        for(let r=0; r<rows; r++) {
+            for(let c=0; c<cols; c++) {
+                const slot = document.createElement('div');
+                slot.className = 'slot';
+                slot.dataset.col = c; // Save column ID
+                slot.onclick = () => makeMove(c);
+                boardDiv.appendChild(slot);
+            }
+        }
+
+        function makeMove(col) {
+            if(!gameActive) return;
+
+            // Find lowest empty row in this column
+            let row = -1;
+            for(let r=rows-1; r>=0; r--) {
+                if(boardState[r][col] === 0) { row = r; break; }
+            }
+
+            if(row !== -1) {
+                // Player Move
+                boardState[row][col] = 1;
+                renderMove(row, col, 'p1');
+                
+                if(checkWin(1)) { endGame("YOU WIN!"); return; }
+
+                // AI Turn
+                document.getElementById('status').innerText = "AI THINKING...";
+                document.getElementById('status').style.color = "#ff0055";
+                
+                fetch('/move_connect4', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ board: boardState })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if(data.col !== null) {
+                        setTimeout(() => {
+                            boardState[data.row][data.col] = 2;
+                            renderMove(data.row, data.col, 'p2');
+                            if(checkWin(2)) { endGame("AI WINS!"); return; }
+                            document.getElementById('status').innerText = "YOUR TURN (YELLOW)";
+                            document.getElementById('status').style.color = "#ffcc00";
+                        }, 500);
+                    }
+                });
+            }
+        }
+
+        function renderMove(row, col, cls) {
+            const index = (row * 7) + col;
+            const slot = document.querySelectorAll('.slot')[index];
+            slot.innerHTML = `<div class="piece ${cls}"></div>`;
+        }
+
+        function checkWin(player) {
+            // Horizontal
+            for(let r=0; r<rows; r++) 
+                for(let c=0; c<cols-3; c++) 
+                    if(boardState[r][c] == player && boardState[r][c+1] == player && boardState[r][c+2] == player && boardState[r][c+3] == player) return true;
+            // Vertical
+            for(let r=0; r<rows-3; r++) 
+                for(let c=0; c<cols; c++) 
+                    if(boardState[r][c] == player && boardState[r+1][c] == player && boardState[r+2][c] == player && boardState[r+3][c] == player) return true;
+            // Diagonals
+            for(let r=3; r<rows; r++) 
+                for(let c=0; c<cols-3; c++) 
+                    if(boardState[r][c] == player && boardState[r-1][c+1] == player && boardState[r-2][c+2] == player && boardState[r-3][c+3] == player) return true;
+            for(let r=0; r<rows-3; r++) 
+                for(let c=0; c<cols-3; c++) 
+                    if(boardState[r][c] == player && boardState[r+1][c+1] == player && boardState[r+2][c+2] == player && boardState[r+3][c+3] == player) return true;
+            return false;
+        }
+
+        function endGame(msg) {
+            gameActive = false;
+            document.getElementById('status').innerText = msg;
+            let color = msg === "YOU WIN!" ? "#00ff00" : "#ff0055";
+            let icon = msg === "YOU WIN!" ? "success" : "error";
+            
+            setTimeout(() => {
+                Swal.fire({
+                    title: msg,
+                    icon: icon,
+                    background: '#0a0a0a', 
+                    color: color,
+                    showCancelButton: true, // Shows the "Review Board" button
+                    confirmButtonText: 'RESTART',
+                    cancelButtonText: 'REVIEW BOARD',
+                    confirmButtonColor: color,
+                    cancelButtonColor: '#333',
+                    customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title' }
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        location.reload(); // Restart only if confirmed
+                    }
+                    // If Cancel is clicked, the popup closes and you can see the board
+                });
+            }, 500);
+        }
+    </script>
+
+<!-- ═══════════════════════════════════════════════
+     NEURAL ARENA — UNIVERSAL ENHANCEMENTS v1.0
+     1) Page Transition  2) Btn Particle Burst
+     3) UI Sounds        4) Achievement System
+═══════════════════════════════════════════════ -->
+<div id="na-transition-overlay" style="
+  position:fixed;inset:0;z-index:999999;
+  background:#000;opacity:0;pointer-events:none;
+  transition:opacity .3s ease;
+"></div>
+
+<div id="na-achievement-toast" style="
+  position:fixed;bottom:28px;right:28px;z-index:999998;
+  background:rgba(0,0,0,.92);border:1px solid var(--ac,#00ffcc);
+  border-radius:8px;padding:12px 18px;font-family:'Orbitron',monospace;
+  font-size:.72rem;color:var(--ac,#00ffcc);letter-spacing:2px;
+  box-shadow:0 0 24px var(--ac,#00ffcc);
+  opacity:0;transform:translateY(16px);
+  transition:opacity .35s,transform .35s;pointer-events:none;
+  display:flex;align-items:center;gap:10px;
+"></div>
+
+<script>
+(function(){
+'use strict';
+
+/* ── 0. Detect accent colour from back-btn ─────────────────────────── */
+const accentDetect = () => {
+  const bb = document.querySelector('.back-btn');
+  if(!bb) return '#00ffcc';
+  const s = getComputedStyle(bb);
+  return s.color || '#00ffcc';
+};
+const ACCENT = accentDetect();
+document.documentElement.style.setProperty('--ac', ACCENT);
+
+/* ── 1. PAGE TRANSITION ────────────────────────────────────────────── */
+const overlay = document.getElementById('na-transition-overlay');
+overlay.style.borderColor = ACCENT;
+
+function navigateWithTransition(href){
+  if(!href || href === '#') return;
+  overlay.style.pointerEvents = 'all';
+  overlay.style.opacity = '1';
+  setTimeout(() => { window.location.href = href; }, 310);
+}
+
+// Intercept back-btn clicks
+document.addEventListener('click', e => {
+  const btn = e.target.closest('.back-btn');
+  if(btn && btn.href){
+    e.preventDefault();
+    playWhoosh();
+    navigateWithTransition(btn.href);
+  }
+}, true);
+
+// Fade-in on arrival
+window.addEventListener('DOMContentLoaded', () => {
+  overlay.style.transition = 'none';
+  overlay.style.opacity = '1';
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      overlay.style.transition = 'opacity .35s ease';
+      overlay.style.opacity = '0';
+    });
+  });
+});
+
+/* ── 2. BACK-BTN HOVER PARTICLE BURST ──────────────────────────────── */
+const bgCv = document.getElementById('neural-bg');
+
+function spawnBurstParticle(x, y){
+  if(!bgCv) return;
+  const angle = Math.random() * Math.PI * 2;
+  const speed = 2 + Math.random() * 3.5;
+  const life  = { v: 1 };
+  const px = x - bgCv.getBoundingClientRect().left;
+  const py = y - bgCv.getBoundingClientRect().top;
+  let vx = Math.cos(angle) * speed;
+  let vy = Math.sin(angle) * speed;
+  let cx = px, cy = py;
+  const ctx2 = bgCv.getContext('2d');
+
+  function draw(){
+    if(life.v <= 0) return;
+    ctx2.save();
+    ctx2.globalAlpha = life.v * 0.8;
+    ctx2.fillStyle = ACCENT;
+    ctx2.shadowColor = ACCENT;
+    ctx2.shadowBlur = 6;
+    ctx2.beginPath();
+    ctx2.arc(cx, cy, 3 * life.v, 0, Math.PI*2);
+    ctx2.fill();
+    ctx2.restore();
+    cx += vx; cy += vy;
+    vx *= 0.92; vy *= 0.92;
+    life.v -= 0.045;
+    requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+document.addEventListener('mouseenter', e => {
+  const btn = e.target.closest('.back-btn');
+  if(!btn) return;
+  const r = btn.getBoundingClientRect();
+  const cx = r.left + r.width/2;
+  const cy = r.top  + r.height/2;
+  for(let i=0; i<8; i++) spawnBurstParticle(cx, cy);
+}, true);
+
+/* ── 3. UI SOUNDS (Web Audio, no files) ────────────────────────────── */
+let _audioCtx = null;
+function getAudioCtx(){
+  if(!_audioCtx) try { _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){}
+  return _audioCtx;
+}
+
+function playWhoosh(){
+  const ac = getAudioCtx(); if(!ac) return;
+  const buf = ac.createBuffer(1, ac.sampleRate * .25, ac.sampleRate);
+  const data = buf.getChannelData(0);
+  for(let i=0;i<data.length;i++) data[i] = (Math.random()*2-1) * (1 - i/data.length);
+  const src = ac.createBufferSource();
+  src.buffer = buf;
+  const f = ac.createBiquadFilter(); f.type='bandpass'; f.frequency.value=800; f.Q.value=0.5;
+  const g = ac.createGain(); g.gain.setValueAtTime(.18, ac.currentTime); g.gain.exponentialRampToValueAtTime(.001, ac.currentTime+.25);
+  src.connect(f); f.connect(g); g.connect(ac.destination);
+  src.start();
+}
+
+function playBeep(freq=1100, dur=.09){
+  const ac = getAudioCtx(); if(!ac) return;
+  const o = ac.createOscillator();
+  const g = ac.createGain();
+  o.type = 'sine';
+  o.frequency.setValueAtTime(freq, ac.currentTime);
+  o.frequency.exponentialRampToValueAtTime(freq*0.6, ac.currentTime+dur);
+  g.gain.setValueAtTime(.08, ac.currentTime);
+  g.gain.exponentialRampToValueAtTime(.001, ac.currentTime+dur);
+  o.connect(g); g.connect(ac.destination);
+  o.start(); o.stop(ac.currentTime+dur);
+}
+
+function playConfirm(){
+  playBeep(880, .06);
+  setTimeout(()=>playBeep(1320,.06), 70);
+}
+
+// Wire sounds to AI / action buttons (exclude back-btn — already has whoosh)
+document.addEventListener('click', e => {
+  const btn = e.target.closest('button');
+  if(!btn) return;
+  if(btn.closest('#na-achievement-toast')) return;
+  const txt = (btn.innerText||'').toLowerCase();
+  // whoosh for nav/reset, confirm beep for AI/action
+  if(txt.includes('ai') || txt.includes('run') || txt.includes('solve') ||
+     txt.includes('evolve') || txt.includes('decrypt') || txt.includes('submit') ||
+     txt.includes('recursion') || txt.includes('pilot') || txt.includes('tactical') ||
+     txt.includes('encrypt') || txt.includes('cluster') || txt.includes('paint') ||
+     txt.includes('step') || txt.includes('next') || txt.includes('shield') ||
+     txt.includes('scan') || txt.includes('tour')) {
+    playConfirm();
+  } else if(txt.includes('reset') || txt.includes('restart') || txt.includes('reboot') ||
+            txt.includes('clear') || txt.includes('new') || txt.includes('scramble') ||
+            txt.includes('randomize') || txt.includes('reload')) {
+    playWhoosh();
+  } else {
+    playBeep(660, .05); // generic click tick
+  }
+}, true);
+
+/* ── 4. ACHIEVEMENT SYSTEM ─────────────────────────────────────────── */
+const toast = document.getElementById('na-achievement-toast');
+let toastTimer = null;
+
+function showAchievement(icon, title, desc){
+  toast.innerHTML = `<span style="font-size:1.4rem">${icon}</span><div><div style="color:var(--ac,#00ffcc);letter-spacing:2px">${title}</div><div style="color:#aaa;font-size:.62rem;margin-top:2px;letter-spacing:1px">${desc}</div></div>`;
+  toast.style.opacity = '1';
+  toast.style.transform = 'translateY(0)';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>{
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(16px)';
+  }, 3500);
+}
+
+function unlockAchievement(key, icon, title, desc){
+  const stored = JSON.parse(localStorage.getItem('na_achievements') || '{}');
+  if(stored[key]) return false; // already earned
+  stored[key] = { ts: Date.now(), title, desc };
+  localStorage.setItem('na_achievements', JSON.stringify(stored));
+  showAchievement(icon, title, desc);
+  return true;
+}
+
+// Expose globally so per-game code can call it
+window.NA = window.NA || {};
+window.NA.unlockAchievement = unlockAchievement;
+window.NA.playBeep     = playBeep;
+window.NA.playConfirm  = playConfirm;
+window.NA.playWhoosh   = playWhoosh;
+window.NA.navigateTo   = navigateWithTransition;
+
+})();
+</script>
+
+
+<script>
+/* connect4 achievements */
+(function(){
+  const origEnd = window.endGame;
+  if(origEnd) window.endGame = function(msg){
+    if(msg.includes('YOU WIN')) window.NA.unlockAchievement('c4_win','🏆','GRAVITY MASTER','Beat the Alpha-Beta AI!');
+    origEnd(msg);
+  };
+  let movesMade = 0;
+  const origMake = window.makeMove;
+  if(origMake) window.makeMove = function(col){
+    movesMade++;
+    if(movesMade === 1) window.NA.unlockAchievement('c4_first','🔵','FIRST DROP','Made your first move!');
+    origMake(col);
+  };
+})();
+</script>
+
+</body>
+</html>

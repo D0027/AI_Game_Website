@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEURAL ARENA | Neon Color</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        /* --- CORE STYLES --- */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: #020202; color: #fff; font-family: 'Rajdhani', sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+            min-height: 100vh; overflow-y: auto; padding-top: 20px; padding-bottom: 50px;
+            user-select: none;
+        }
+        #neural-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; background: radial-gradient(circle at center, #1a1a1a 0%, #000 100%); }
+        .scanlines { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2)); background-size: 100% 4px; pointer-events: none; z-index: -1; opacity: 0.3; }
+
+        .back-btn { position: absolute; top: 30px; left: 30px; text-decoration: none; color: #fff; font-family: 'Orbitron'; font-size: 1rem; border: 1px solid #fff; padding: 10px 20px; border-radius: 5px; transition: 0.3s; background: rgba(255, 255, 255, 0.1); }
+        .back-btn:hover { background-color: #fff; color: #000; box-shadow: 0 0 25px #fff; }
+
+        h1 { font-family: 'Orbitron'; font-size: 3.5rem; text-shadow: 0 0 20px #fff; color: #fff; margin-bottom: 30px; margin-top: 40px; }
+
+        #colorCanvas {
+            background: rgba(20, 20, 20, 0.9);
+            border: 2px solid #fff;
+            box-shadow: 0 0 40px rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .controls-area { margin-top: 30px; display: flex; gap: 20px; }
+        button {
+            padding: 10px 30px; font-family: 'Orbitron'; font-size: 1rem; color: #000; background: #fff;
+            border: none; cursor: pointer; border-radius: 5px; box-shadow: 0 0 20px #fff; transition: 0.3s;
+        }
+        button:hover { transform: scale(1.1); box-shadow: 0 0 40px #fff; }
+        .btn-guide { background: transparent; border: 2px solid #fff; color: #fff; }
+        .btn-guide:hover { background: #fff; color: #000; }
+
+        .swal-custom-popup { background: #0a0a0a !important; border: 2px solid #fff !important; }
+        .swal-custom-title { color: #fff !important; font-family: 'Orbitron' !important; }
+        .swal-custom-content { color: #ccc !important; font-family: 'Rajdhani' !important; font-size: 1.1rem; text-align: left;}
+    </style>
+</head>
+<body>
+    <canvas id="neural-bg"></canvas>
+    <div class="scanlines"></div>
+
+    <a href="/" class="back-btn">← DASHBOARD</a>
+    <h1>NEON COLOR</h1>
+
+    <canvas id="colorCanvas" width="800" height="500"></canvas>
+
+    <div class="controls-area">
+        <button class="btn-guide" onclick="showGuide()">MISSION BRIEF</button>
+        <button class="btn-guide" onclick="initGraph()">SCRAMBLE GRAPH</button>
+        <button onclick="runAI()">AI AUTO-PAINT</button>
+    </div>
+
+    <script>
+        const bgCanvas = document.getElementById('neural-bg'); const bgCtx = bgCanvas.getContext('2d');
+        bgCanvas.width = window.innerWidth; bgCanvas.height = window.innerHeight;
+        let particles=[]; class Particle{constructor(){this.x=Math.random()*bgCanvas.width;this.y=Math.random()*bgCanvas.height;this.size=Math.random()*2;this.speedX=(Math.random()*1.0)-0.5;this.speedY=(Math.random()*1.0)-0.5;this.color='#fff';}update(){this.x+=this.speedX;this.y+=this.speedY;if(this.x<0||this.x>bgCanvas.width)this.speedX*=-1;if(this.y<0||this.y>bgCanvas.height)this.speedY*=-1;}draw(){bgCtx.fillStyle=this.color;bgCtx.beginPath();bgCtx.arc(this.x,this.y,this.size,0,Math.PI*2);bgCtx.fill();}}
+        function initBg(){particles=[];for(let i=0;i<60;i++)particles.push(new Particle());}
+        function animateBg(){bgCtx.clearRect(0,0,bgCanvas.width,bgCanvas.height);for(let i=0;i<particles.length;i++){particles[i].update();particles[i].draw();connect(i);}requestAnimationFrame(animateBg);}
+        function connect(a){for(let b=a;b<particles.length;b++){let dist=((particles[a].x-particles[b].x)**2+(particles[a].y-particles[b].y)**2);if(dist<(bgCanvas.width/7)*(bgCanvas.height/7)){bgCtx.strokeStyle='rgba(255, 255, 255,'+(1-dist/25000)+')';bgCtx.lineWidth=1;bgCtx.beginPath();bgCtx.moveTo(particles[a].x,particles[a].y);bgCtx.lineTo(particles[b].x,particles[b].y);bgCtx.stroke();}}}
+        window.addEventListener('resize',()=>{bgCanvas.width=window.innerWidth;bgCanvas.height=window.innerHeight;initBg();});initBg(); animateBg();
+    </script>
+
+    <script>
+        const canvas = document.getElementById('colorCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Colors: Empty (0), then Red, Green, Blue, Yellow, Cyan, Magenta
+        const PALETTE = ['#333', '#ff0000', '#00ff00', '#0000ff', '#ffff00', '#00ffff', '#ff00ff'];
+        
+        let nodes = [];
+        let edges = [];
+        
+        function initGraph() {
+            nodes = [];
+            edges = [];
+            
+            // Generate Nodes
+            for(let i=0; i<10; i++) {
+                nodes.push({
+                    id: i,
+                    x: Math.random() * (canvas.width - 100) + 50,
+                    y: Math.random() * (canvas.height - 100) + 50,
+                    colorIdx: 0
+                });
+            }
+            
+            // Connect randomly (Geometric Graph: connect if close)
+            for(let i=0; i<nodes.length; i++) {
+                for(let j=i+1; j<nodes.length; j++) {
+                    let d = Math.hypot(nodes[i].x - nodes[j].x, nodes[i].y - nodes[j].y);
+                    if(d < 250 && Math.random() > 0.4) {
+                        edges.push({source: i, target: j});
+                    }
+                }
+            }
+            draw();
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw Edges
+            edges.forEach(e => {
+                let n1 = nodes[e.source];
+                let n2 = nodes[e.target];
+                
+                // Conflict Check
+                let isConflict = (n1.colorIdx !== 0 && n1.colorIdx === n2.colorIdx);
+                
+                ctx.beginPath();
+                ctx.lineWidth = isConflict ? 4 : 2;
+                ctx.strokeStyle = isConflict ? "#ff0000" : "#555";
+                
+                if(isConflict) { ctx.shadowBlur = 15; ctx.shadowColor = "#ff0000"; }
+                
+                ctx.moveTo(n1.x, n1.y);
+                ctx.lineTo(n2.x, n2.y);
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+            });
+
+            // Draw Nodes
+            nodes.forEach(n => {
+                ctx.beginPath();
+                ctx.arc(n.x, n.y, 15, 0, Math.PI*2);
+                ctx.fillStyle = PALETTE[n.colorIdx];
+                ctx.shadowBlur = 15; ctx.shadowColor = PALETTE[n.colorIdx];
+                if(n.colorIdx === 0) ctx.shadowBlur = 0; // No glow for empty
+                ctx.fill();
+                
+                ctx.strokeStyle = "#fff";
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+            });
+        }
+
+        // --- INTERACTIVITY ---
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            
+            for(let n of nodes) {
+                let d = Math.hypot(n.x - mouseX, n.y - mouseY);
+                if(d < 20) {
+                    // Manual Paint: Cycle colors
+                    n.colorIdx = (n.colorIdx + 1) % PALETTE.length;
+                    if(n.colorIdx === 0) n.colorIdx = 1; // Skip empty on cycle
+                    draw();
+                    checkWin();
+                    return;
+                }
+            }
+        });
+
+        function checkWin() {
+            let conflict = false;
+            let full = true;
+            
+            for(let n of nodes) if(n.colorIdx === 0) full = false;
+            
+            for(let e of edges) {
+                if(nodes[e.source].colorIdx === nodes[e.target].colorIdx && nodes[e.source].colorIdx !== 0) {
+                    conflict = true;
+                }
+            }
+            
+            if(full && !conflict) {
+                Swal.fire({
+                    title: "GRAPH STABILIZED",
+                    text: "Perfect chromatic resonance achieved.",
+                    background: '#0a0a0a', color: '#fff', icon: 'success',
+                    timer: 1500, showConfirmButton: false,
+                    customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title' }
+                });
+            }
+        }
+
+        function runAI() {
+            fetch('/solve_color', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ nodes: nodes, edges: edges })
+            })
+            .then(res => res.json())
+            .then(data => {
+                let colorMap = data.colors;
+                
+                // Animate filling
+                let keys = Object.keys(colorMap);
+                let i = 0;
+                
+                function paintNext() {
+                    if(i >= keys.length) {
+                        checkWin();
+                        return;
+                    }
+                    let nid = parseInt(keys[i]);
+                    // Map AI color index (0-based) to Palette (1-based to skip grey)
+                    // AI returns 0,1,2.. we map to 1,2,3..
+                    nodes[nid].colorIdx = (colorMap[nid] % (PALETTE.length - 1)) + 1;
+                    draw();
+                    i++;
+                    setTimeout(paintNext, 100);
+                }
+                paintNext();
+            });
+        }
+
+        function showGuide() {
+            Swal.fire({
+                title: 'MISSION BRIEF',
+                html: `
+                    <ul style="list-style: none; padding: 0; text-align: left;">
+                        <li style="margin-bottom: 10px;">► <strong>GOAL:</strong> Assign colors so that NO two connected nodes share the same color.</li>
+                        <li style="margin-bottom: 10px;">► <strong>MANUAL MODE:</strong> Click nodes to cycle colors. Wires turn RED if there is a conflict.</li>
+                        <li style="margin-bottom: 10px;">► <strong>AI ASSIST:</strong> Uses a <strong>Greedy Coloring Algorithm</strong> to find a valid solution using minimal colors.</li>
+                    </ul>
+                `,
+                background: '#0a0a0a', color: '#fff',
+                confirmButtonText: 'ACKNOWLEDGED',
+                confirmButtonColor: '#fff',
+                customClass: { popup: 'swal-custom-popup', title: 'swal-custom-title', content: 'swal-custom-content' }
+            });
+        }
+
+        initGraph();
+    </script>
+
+<!-- ═══════════════════════════════════════════════
+     NEURAL ARENA — UNIVERSAL ENHANCEMENTS v1.0
+     1) Page Transition  2) Btn Particle Burst
+     3) UI Sounds        4) Achievement System
+═══════════════════════════════════════════════ -->
+<div id="na-transition-overlay" style="
+  position:fixed;inset:0;z-index:999999;
+  background:#000;opacity:0;pointer-events:none;
+  transition:opacity .3s ease;
+"></div>
+
+<div id="na-achievement-toast" style="
+  position:fixed;bottom:28px;right:28px;z-index:999998;
+  background:rgba(0,0,0,.92);border:1px solid var(--ac,#00ffcc);
+  border-radius:8px;padding:12px 18px;font-family:'Orbitron',monospace;
+  font-size:.72rem;color:var(--ac,#00ffcc);letter-spacing:2px;
+  box-shadow:0 0 24px var(--ac,#00ffcc);
+  opacity:0;transform:translateY(16px);
+  transition:opacity .35s,transform .35s;pointer-events:none;
+  display:flex;align-items:center;gap:10px;
+"></div>
+
+<script>
+(function(){
+'use strict';
+
+/* ── 0. Detect accent colour from back-btn ─────────────────────────── */
+const accentDetect = () => {
+  const bb = document.querySelector('.back-btn');
+  if(!bb) return '#00ffcc';
+  const s = getComputedStyle(bb);
+  return s.color || '#00ffcc';
+};
+const ACCENT = accentDetect();
+document.documentElement.style.setProperty('--ac', ACCENT);
+
+/* ── 1. PAGE TRANSITION ────────────────────────────────────────────── */
+const overlay = document.getElementById('na-transition-overlay');
+overlay.style.borderColor = ACCENT;
+
+function navigateWithTransition(href){
+  if(!href || href === '#') return;
+  overlay.style.pointerEvents = 'all';
+  overlay.style.opacity = '1';
+  setTimeout(() => { window.location.href = href; }, 310);
+}
+
+// Intercept back-btn clicks
+document.addEventListener('click', e => {
+  const btn = e.target.closest('.back-btn');
+  if(btn && btn.href){
+    e.preventDefault();
+    playWhoosh();
+    navigateWithTransition(btn.href);
+  }
+}, true);
+
+// Fade-in on arrival
+window.addEventListener('DOMContentLoaded', () => {
+  overlay.style.transition = 'none';
+  overlay.style.opacity = '1';
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      overlay.style.transition = 'opacity .35s ease';
+      overlay.style.opacity = '0';
+    });
+  });
+});
+
+/* ── 2. BACK-BTN HOVER PARTICLE BURST ──────────────────────────────── */
+const bgCv = document.getElementById('neural-bg');
+
+function spawnBurstParticle(x, y){
+  if(!bgCv) return;
+  const angle = Math.random() * Math.PI * 2;
+  const speed = 2 + Math.random() * 3.5;
+  const life  = { v: 1 };
+  const px = x - bgCv.getBoundingClientRect().left;
+  const py = y - bgCv.getBoundingClientRect().top;
+  let vx = Math.cos(angle) * speed;
+  let vy = Math.sin(angle) * speed;
+  let cx = px, cy = py;
+  const ctx2 = bgCv.getContext('2d');
+
+  function draw(){
+    if(life.v <= 0) return;
+    ctx2.save();
+    ctx2.globalAlpha = life.v * 0.8;
+    ctx2.fillStyle = ACCENT;
+    ctx2.shadowColor = ACCENT;
+    ctx2.shadowBlur = 6;
+    ctx2.beginPath();
+    ctx2.arc(cx, cy, 3 * life.v, 0, Math.PI*2);
+    ctx2.fill();
+    ctx2.restore();
+    cx += vx; cy += vy;
+    vx *= 0.92; vy *= 0.92;
+    life.v -= 0.045;
+    requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+document.addEventListener('mouseenter', e => {
+  const btn = e.target.closest('.back-btn');
+  if(!btn) return;
+  const r = btn.getBoundingClientRect();
+  const cx = r.left + r.width/2;
+  const cy = r.top  + r.height/2;
+  for(let i=0; i<8; i++) spawnBurstParticle(cx, cy);
+}, true);
+
+/* ── 3. UI SOUNDS (Web Audio, no files) ────────────────────────────── */
+let _audioCtx = null;
+function getAudioCtx(){
+  if(!_audioCtx) try { _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){}
+  return _audioCtx;
+}
+
+function playWhoosh(){
+  const ac = getAudioCtx(); if(!ac) return;
+  const buf = ac.createBuffer(1, ac.sampleRate * .25, ac.sampleRate);
+  const data = buf.getChannelData(0);
+  for(let i=0;i<data.length;i++) data[i] = (Math.random()*2-1) * (1 - i/data.length);
+  const src = ac.createBufferSource();
+  src.buffer = buf;
+  const f = ac.createBiquadFilter(); f.type='bandpass'; f.frequency.value=800; f.Q.value=0.5;
+  const g = ac.createGain(); g.gain.setValueAtTime(.18, ac.currentTime); g.gain.exponentialRampToValueAtTime(.001, ac.currentTime+.25);
+  src.connect(f); f.connect(g); g.connect(ac.destination);
+  src.start();
+}
+
+function playBeep(freq=1100, dur=.09){
+  const ac = getAudioCtx(); if(!ac) return;
+  const o = ac.createOscillator();
+  const g = ac.createGain();
+  o.type = 'sine';
+  o.frequency.setValueAtTime(freq, ac.currentTime);
+  o.frequency.exponentialRampToValueAtTime(freq*0.6, ac.currentTime+dur);
+  g.gain.setValueAtTime(.08, ac.currentTime);
+  g.gain.exponentialRampToValueAtTime(.001, ac.currentTime+dur);
+  o.connect(g); g.connect(ac.destination);
+  o.start(); o.stop(ac.currentTime+dur);
+}
+
+function playConfirm(){
+  playBeep(880, .06);
+  setTimeout(()=>playBeep(1320,.06), 70);
+}
+
+// Wire sounds to AI / action buttons (exclude back-btn — already has whoosh)
+document.addEventListener('click', e => {
+  const btn = e.target.closest('button');
+  if(!btn) return;
+  if(btn.closest('#na-achievement-toast')) return;
+  const txt = (btn.innerText||'').toLowerCase();
+  // whoosh for nav/reset, confirm beep for AI/action
+  if(txt.includes('ai') || txt.includes('run') || txt.includes('solve') ||
+     txt.includes('evolve') || txt.includes('decrypt') || txt.includes('submit') ||
+     txt.includes('recursion') || txt.includes('pilot') || txt.includes('tactical') ||
+     txt.includes('encrypt') || txt.includes('cluster') || txt.includes('paint') ||
+     txt.includes('step') || txt.includes('next') || txt.includes('shield') ||
+     txt.includes('scan') || txt.includes('tour')) {
+    playConfirm();
+  } else if(txt.includes('reset') || txt.includes('restart') || txt.includes('reboot') ||
+            txt.includes('clear') || txt.includes('new') || txt.includes('scramble') ||
+            txt.includes('randomize') || txt.includes('reload')) {
+    playWhoosh();
+  } else {
+    playBeep(660, .05); // generic click tick
+  }
+}, true);
+
+/* ── 4. ACHIEVEMENT SYSTEM ─────────────────────────────────────────── */
+const toast = document.getElementById('na-achievement-toast');
+let toastTimer = null;
+
+function showAchievement(icon, title, desc){
+  toast.innerHTML = `<span style="font-size:1.4rem">${icon}</span><div><div style="color:var(--ac,#00ffcc);letter-spacing:2px">${title}</div><div style="color:#aaa;font-size:.62rem;margin-top:2px;letter-spacing:1px">${desc}</div></div>`;
+  toast.style.opacity = '1';
+  toast.style.transform = 'translateY(0)';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>{
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(16px)';
+  }, 3500);
+}
+
+function unlockAchievement(key, icon, title, desc){
+  const stored = JSON.parse(localStorage.getItem('na_achievements') || '{}');
+  if(stored[key]) return false; // already earned
+  stored[key] = { ts: Date.now(), title, desc };
+  localStorage.setItem('na_achievements', JSON.stringify(stored));
+  showAchievement(icon, title, desc);
+  return true;
+}
+
+// Expose globally so per-game code can call it
+window.NA = window.NA || {};
+window.NA.unlockAchievement = unlockAchievement;
+window.NA.playBeep     = playBeep;
+window.NA.playConfirm  = playConfirm;
+window.NA.playWhoosh   = playWhoosh;
+window.NA.navigateTo   = navigateWithTransition;
+
+})();
+</script>
+
+
+<script>
+/* color achievements */
+(function(){
+  let manualPaints = 0;
+  const origDraw = window.draw;
+  // Count manual node color changes via canvas click
+  document.getElementById('colorCanvas')?.addEventListener('mousedown', () => {
+    manualPaints++;
+    if(manualPaints === 1) window.NA.unlockAchievement('color_first','🎨','FIRST STROKE','Manually painted a node!');
+    if(manualPaints >= 10) window.NA.unlockAchievement('color_10','🖌️','PAINTER','Painted 10+ nodes!');
+  });
+  const origRunAI = window.runAI;
+  if(origRunAI) window.runAI = function(){
+    window.NA.unlockAchievement('color_ai','🤖','DSATUR','Used AI Graph Coloring!');
+    origRunAI();
+  };
+  const origCheck = window.checkWin;
+  if(origCheck) window.checkWin = function(){
+    origCheck();
+    // checkWin fires Swal on success — we just hook pre-emptively
+    const conflict = window.edges?.some(e => window.nodes?.[e.source]?.colorIdx === window.nodes?.[e.target]?.colorIdx && window.nodes?.[e.source]?.colorIdx !== 0);
+    const full = window.nodes?.every(n => n.colorIdx !== 0);
+    if(full && !conflict) window.NA.unlockAchievement('color_win','✨','GRAPH STABLE','Achieved perfect chromatic resonance!');
+  };
+})();
+</script>
+
+</body>
+</html>
